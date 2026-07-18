@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Expense, Income, Category, TransactionStatus } from '@/types/financial';
@@ -7,9 +8,9 @@ import {
   PlusCircle, FilterX, HelpCircle, ArrowRightLeft, FolderOpen,
   DollarSign, FileSpreadsheet, ListFilter, CheckSquare, Sparkles,
   Lock, Unlock, ChevronRight, Tags, AlertCircle, Trash2, CheckCircle2,
-  LayoutDashboard, Receipt, Settings, Users, CreditCard, BarChart3
+  LayoutDashboard, Receipt, Settings, Users, CreditCard, BarChart3, Menu
 } from 'lucide-react';
-import DateRangeFilter from '@/components/DateRangeFilter';
+import DateRangeFilter, { DateRangeOption } from '@/components/DateRangeFilter';
 import CategoryCardsGrid from '@/components/CategoryCardsGrid';
 import ExpensesTable from '@/components/ExpensesTable';
 import CurrencyValue from '@/components/CurrencyValue';
@@ -84,7 +85,21 @@ export default function FinancialDashboard() {
   const [quickFilter, setQuickFilter] = useState<'all' | 'payables'>('all');
   const [ledgerMode, setLedgerMode] = useState<'despesa' | 'receita'>('despesa');
   const [showRevenueSummary, setShowRevenueSummary] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'categories' | 'reports'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'categories' | 'reports' | 'users' | 'settings'>('overview');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('current');
+  const [customStartDate, setCustomStartDate] = useState('2026-07-01');
+  const [customEndDate, setCustomEndDate] = useState('2026-07-31');
+
+  // School settings states (persisted)
+  const [schoolName, setSchoolName] = useState('Centro Educacional Batista Sobrinho');
+  const [schoolNickName, setSchoolNickName] = useState('CEBS');
+  const [schoolDocument, setSchoolDocument] = useState('12.345.678/0001-90');
+  const [schoolPhone, setSchoolPhone] = useState('(81) 3456-7890');
+  const [schoolEmail, setSchoolEmail] = useState('financeiro@cebs.edu.br');
+  const [schoolCostCenters, setSchoolCostCenters] = useState('Administração, Pedagógico, Alimentação, Limpeza, Eventos');
+  const [schoolPrefAlerts, setSchoolPrefAlerts] = useState(true);
+  const [schoolPrefCloseLock, setSchoolPrefCloseLock] = useState(true);
 
   // Advanced Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,6 +178,24 @@ export default function FinancialDashboard() {
       setIsMonthClosed(JSON.parse(localClosed));
     }
 
+    // 5. Settings
+    const localSettings = localStorage.getItem('school_settings_v3');
+    if (localSettings) {
+      try {
+        const parsed = JSON.parse(localSettings);
+        if (parsed.schoolName) setSchoolName(parsed.schoolName);
+        if (parsed.schoolNickName) setSchoolNickName(parsed.schoolNickName);
+        if (parsed.schoolDocument) setSchoolDocument(parsed.schoolDocument);
+        if (parsed.schoolPhone) setSchoolPhone(parsed.schoolPhone);
+        if (parsed.schoolEmail) setSchoolEmail(parsed.schoolEmail);
+        if (parsed.schoolCostCenters) setSchoolCostCenters(parsed.schoolCostCenters);
+        if (parsed.schoolPrefAlerts !== undefined) setSchoolPrefAlerts(parsed.schoolPrefAlerts);
+        if (parsed.schoolPrefCloseLock !== undefined) setSchoolPrefCloseLock(parsed.schoolPrefCloseLock);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
     setIsMounted(true);
   }, []);
 
@@ -191,6 +224,21 @@ export default function FinancialDashboard() {
     }
   }, [isMonthClosed, isMounted]);
 
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('school_settings_v3', JSON.stringify({
+        schoolName,
+        schoolNickName,
+        schoolDocument,
+        schoolPhone,
+        schoolEmail,
+        schoolCostCenters,
+        schoolPrefAlerts,
+        schoolPrefCloseLock,
+      }));
+    }
+  }, [schoolName, schoolNickName, schoolDocument, schoolPhone, schoolEmail, schoolCostCenters, schoolPrefAlerts, schoolPrefCloseLock, isMounted]);
+
   // Helpers for Toast notifications
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -205,15 +253,34 @@ export default function FinancialDashboard() {
     }]);
   };
 
+  // Date range bounds calculation
+  const dateBounds = useMemo(() => {
+    switch (dateRangeOption) {
+      case 'previous':
+        return { start: '2026-06-01', end: '2026-06-30', label: '01/06/2026 à 30/06/2026' };
+      case '3months':
+        return { start: '2026-05-01', end: '2026-07-31', label: '01/05/2026 à 31/07/2026' };
+      case '6months':
+        return { start: '2026-02-01', end: '2026-07-31', label: '01/02/2026 à 31/07/2026' };
+      case 'year':
+        return { start: '2026-01-01', end: '2026-12-31', label: 'Ano de 2026' };
+      case 'custom':
+        return { start: customStartDate, end: customEndDate, label: 'Custom' };
+      case 'current':
+      default:
+        return { start: '2026-07-01', end: '2026-07-31', label: '01/07/2026 à 31/07/2026' };
+    }
+  }, [dateRangeOption, customStartDate, customEndDate]);
+
   // Rule: Dynamic Status auto-adjustment
   const processedExpenses = useMemo(() => {
     return expenses.map(e => {
-      if (e.status === 'pendente' && e.dueDate < currentDate) {
+      if (schoolPrefAlerts && e.status === 'pendente' && e.dueDate < currentDate) {
         return { ...e, status: 'atrasado' as TransactionStatus };
       }
       return e;
     });
-  }, [expenses, currentDate]);
+  }, [expenses, currentDate, schoolPrefAlerts]);
 
   const cardsData = useMemo(() => {
     const activeIncomes = incomes;
@@ -261,9 +328,35 @@ export default function FinancialDashboard() {
     };
   }, [processedExpenses, currentDate]);
 
+  // Monthly evolution calculation for custom evolution chart
+  const monthlyEvolution = useMemo(() => {
+    const months = [
+      { key: '05', label: 'Maio' },
+      { key: '06', label: 'Junho' },
+      { key: '07', label: 'Julho' },
+    ];
+    return months.map(m => {
+      const total = processedExpenses
+        .filter(e => e.status !== 'cancelado' && e.dueDate.startsWith(`2026-${m.key}`))
+        .reduce((sum, e) => sum + e.amount, 0);
+      return { label: m.label, value: total };
+    });
+  }, [processedExpenses]);
+
+  // Latest 4 expenses for the recent activity panel
+  const latestExpenses = useMemo(() => {
+    return [...processedExpenses]
+      .filter(e => e.status !== 'cancelado')
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate))
+      .slice(0, 4);
+  }, [processedExpenses]);
+
+
   // Filter lists based on categories and quick filters (Enforces PM filter options)
   const filteredExpenses = useMemo(() => {
     return processedExpenses.filter(e => {
+      // Date bounds filter
+      if (e.dueDate < dateBounds.start || e.dueDate > dateBounds.end) return false;
       // Category filter
       if (selectedCategoryName) {
         const cat = categories.find(c => c.id === e.categoryId);
@@ -293,10 +386,12 @@ export default function FinancialDashboard() {
 
       return true;
     });
-  }, [processedExpenses, selectedCategoryName, quickFilter, searchQuery, statusFilter, paymentMethodFilter, costCenterFilter, minAmountFilter, maxAmountFilter, categories]);
+  }, [processedExpenses, selectedCategoryName, quickFilter, searchQuery, statusFilter, paymentMethodFilter, costCenterFilter, minAmountFilter, maxAmountFilter, categories, dateBounds]);
 
   const filteredIncomes = useMemo(() => {
     return incomes.filter(i => {
+      // Date bounds filter
+      if (i.receivedDate < dateBounds.start || i.receivedDate > dateBounds.end) return false;
       // Category filter
       if (selectedCategoryName) {
         const cat = categories.find(c => c.id === i.categoryId);
@@ -322,7 +417,7 @@ export default function FinancialDashboard() {
 
       return true;
     });
-  }, [incomes, selectedCategoryName, searchQuery, statusFilter, paymentMethodFilter, minAmountFilter, maxAmountFilter, categories]);
+  }, [incomes, selectedCategoryName, searchQuery, statusFilter, paymentMethodFilter, minAmountFilter, maxAmountFilter, categories, dateBounds]);
 
   // Reset filter operations
   const handleResetFilters = () => {
@@ -334,13 +429,14 @@ export default function FinancialDashboard() {
     setCostCenterFilter('');
     setMinAmountFilter('');
     setMaxAmountFilter('');
+    setDateRangeOption('current');
   };
 
   // Operations: SAVE (ADD or EDIT)
   const handleSaveExpense = (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
     const isEdit = !!data.id;
     
-    if (isMonthClosed && data.status === 'pago') {
+    if (schoolPrefCloseLock && isMonthClosed && data.status === 'pago') {
       setClosedMonthAlertTriggered(true);
       return;
     }
@@ -348,7 +444,7 @@ export default function FinancialDashboard() {
     if (isEdit) {
       // Edit
       const old = expenses.find(e => e.id === data.id);
-      if (isMonthClosed && old && old.status === 'pago') {
+      if (schoolPrefCloseLock && isMonthClosed && old && old.status === 'pago') {
         setClosedMonthAlertTriggered(true);
         return;
       }
@@ -377,7 +473,7 @@ export default function FinancialDashboard() {
   const handleSaveIncome = (data: Omit<Income, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
     const isEdit = !!data.id;
 
-    if (isMonthClosed) {
+    if (schoolPrefCloseLock && isMonthClosed) {
       setClosedMonthAlertTriggered(true);
       return;
     }
@@ -411,7 +507,7 @@ export default function FinancialDashboard() {
       const target = expenses.find(e => e.id === id);
       if (!target) return;
 
-      if (isMonthClosed && target.status === 'pago') {
+      if (schoolPrefCloseLock && isMonthClosed && target.status === 'pago') {
         setClosedMonthAlertTriggered(true);
         return;
       }
@@ -430,7 +526,7 @@ export default function FinancialDashboard() {
       const target = incomes.find(i => i.id === id);
       if (!target) return;
 
-      if (isMonthClosed) {
+      if (schoolPrefCloseLock && isMonthClosed) {
         setClosedMonthAlertTriggered(true);
         return;
       }
@@ -484,7 +580,7 @@ export default function FinancialDashboard() {
 
   // Operations: CANCEL EXPENSE
   const handleCancelExpense = (id: string) => {
-    if (isMonthClosed) {
+    if (schoolPrefCloseLock && isMonthClosed) {
       setClosedMonthAlertTriggered(true);
       return;
     }
@@ -508,7 +604,7 @@ export default function FinancialDashboard() {
       const target = expenses.find(e => e.id === id);
       if (!target) return;
 
-      if (isMonthClosed && target.status === 'pago') {
+      if (schoolPrefCloseLock && isMonthClosed && target.status === 'pago') {
         setClosedMonthAlertTriggered(true);
         return;
       }
@@ -519,7 +615,7 @@ export default function FinancialDashboard() {
       const target = incomes.find(i => i.id === id);
       if (!target) return;
 
-      if (isMonthClosed) {
+      if (schoolPrefCloseLock && isMonthClosed) {
         setClosedMonthAlertTriggered(true);
         return;
       }
@@ -608,14 +704,60 @@ export default function FinancialDashboard() {
     addToast('info', 'Dados Limpos', 'O sistema foi reiniciado com apenas 1 registro de teste.');
   };
 
+  const handleExportCSV = () => {
+    const headers = ['Descricao', 'Categoria', 'Vencimento', 'Valor (R$)', 'Status', 'Forma de Pagamento', 'Fornecedor', 'Centro de Custo', 'Data de Pagamento', 'Observacoes'];
+    const rows = processedExpenses.map(e => {
+      const cat = categories.find(c => c.id === e.categoryId)?.name || 'Outros';
+      return [
+        e.description,
+        cat,
+        e.dueDate,
+        e.amount.toFixed(2),
+        e.status,
+        e.paymentMethod || '—',
+        e.supplier || '—',
+        e.costCenter || '—',
+        e.paymentDate || '—',
+        e.notes || '—'
+      ];
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + [headers.join(','), ...rows.map(row => row.map(val => `"${val.replace(/"/g, '""')}"`).join(','))].join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `cebs_relatorio_financeiro_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('success', 'Relatório Exportado', 'O arquivo CSV foi gerado e baixado com sucesso.');
+  };
+
   // Helper: get display title for current tab
-  const tabTitle = activeTab === 'overview' ? 'Dashboard' : activeTab === 'expenses' ? 'Despesas' : activeTab === 'categories' ? 'Categorias' : 'Relatórios';
+  const tabTitle = activeTab === 'overview' ? 'Dashboard de Gastos' : activeTab === 'expenses' ? 'Despesas' : activeTab === 'categories' ? 'Categorias' : activeTab === 'reports' ? 'Relatórios' : activeTab === 'users' ? 'Usuários' : 'Configurações';
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: "'Inter', -apple-system, sans-serif", backgroundColor: '#F4F5F7' }}>
 
       {/* ═══════════════ SIDEBAR ═══════════════ */}
-      <aside style={{ width: '232px', backgroundColor: '#1E3280', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 40, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+      <aside
+        style={{
+          width: '232px',
+          backgroundColor: '#1E3280',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          zIndex: 50,
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          transition: 'transform 0.2s ease-in-out',
+        }}
+        className={`${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+      >
 
         {/* Logo block */}
         <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -627,7 +769,7 @@ export default function FinancialDashboard() {
             />
             <div style={{ lineHeight: 1.25 }}>
               <div style={{ color: '#fff', fontWeight: 800, fontSize: '15px', letterSpacing: '-0.01em' }}>CEBS</div>
-              <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '9.5px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Financeiro</div>
+              <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '9.5px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1' }}>Financeiro</div>
             </div>
           </div>
         </div>
@@ -637,14 +779,14 @@ export default function FinancialDashboard() {
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', padding: '8px 10px 5px' }}>Principal</p>
 
           {([
-            { id: 'overview',    label: 'Dashboard',  Icon: LayoutDashboard },
+            { id: 'overview',    label: 'Dashboard de Gastos',  Icon: LayoutDashboard },
             { id: 'expenses',    label: 'Despesas',   Icon: Receipt },
             { id: 'categories',  label: 'Categorias', Icon: Tags },
             { id: 'reports',     label: 'Relatórios', Icon: BarChart3 },
           ] as const).map(({ id, label, Icon }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '9px', width: '100%',
                 padding: '8px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
@@ -667,10 +809,22 @@ export default function FinancialDashboard() {
 
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', padding: '16px 10px 5px' }}>Sistema</p>
           {([
-            { label: 'Usuários', Icon: Users },
-            { label: 'Configurações', Icon: Settings },
-          ] as const).map(({ label, Icon }) => (
-            <button key={label} style={{ display: 'flex', alignItems: 'center', gap: '9px', width: '100%', padding: '8px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px', fontWeight: 500, textAlign: 'left', marginBottom: '1px', color: 'rgba(255,255,255,0.45)', backgroundColor: 'transparent', transition: 'all 0.15s' }}>
+            { id: 'users',    label: 'Usuários',       Icon: Users },
+            { id: 'settings', label: 'Configurações',   Icon: Settings },
+          ] as const).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '9px', width: '100%',
+                padding: '8px 10px', borderRadius: '7px', border: 'none', cursor: 'pointer',
+                fontFamily: 'inherit', fontSize: '13px', textAlign: 'left', marginBottom: '1px',
+                fontWeight: activeTab === id ? 700 : 500,
+                color: activeTab === id ? '#fff' : 'rgba(255,255,255,0.55)',
+                backgroundColor: activeTab === id ? 'rgba(255,255,255,0.13)' : 'transparent',
+                transition: 'all 0.15s ease',
+              }}
+            >
               <Icon style={{ width: '16px', height: '16px', flexShrink: 0 }} />
               {label}
             </button>
@@ -683,16 +837,33 @@ export default function FinancialDashboard() {
         </div>
       </aside>
 
+      {/* Mobile backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/40 z-45 md:hidden"
+        />
+      )}
+
       {/* ═══════════════ MAIN AREA ═══════════════ */}
-      <div style={{ marginLeft: '232px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh', transition: 'margin-left 0.2s ease-in-out' }} className="ml-0 md:ml-[232px]">
 
         {/* ── TOP BAR ── */}
-        <header style={{ backgroundColor: '#fff', borderBottom: '1px solid #E8E9EC', padding: '0 32px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 30, gap: '16px' }}>
+        <header style={{ backgroundColor: '#fff', borderBottom: '1px solid #E8E9EC', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 30, gap: '16px' }} className="px-4 md:px-8">
 
-          {/* Left: current page title */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-            <h1 style={{ fontSize: '15px', fontWeight: 700, color: '#111827', letterSpacing: '-0.01em', lineHeight: 1 }}>{tabTitle}</h1>
-            <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500 }}>CEBS Financeiro · Julho/2026</p>
+          {/* Left: Hamburger menu (mobile) + current page title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-1.5 rounded-lg border border-slate-200 md:hidden bg-white text-slate-600 cursor-pointer focus:outline-none hover:bg-slate-50 transition-colors"
+              title="Abrir Menu"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <h1 style={{ fontSize: '15px', fontWeight: 700, color: '#111827', letterSpacing: '-0.01em', lineHeight: 1 }}>{tabTitle}</h1>
+              <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500 }}>CEBS Financeiro · Julho/2026</p>
+            </div>
           </div>
 
           {/* Right: actions */}
@@ -749,66 +920,70 @@ export default function FinancialDashboard() {
         </header>
 
         {/* ── SUB-TABS ── */}
-        <div style={{ backgroundColor: '#fff', borderBottom: '1px solid #E8E9EC', padding: '0 32px', display: 'flex', alignItems: 'center' }}>
-          {([
-            { id: 'overview',   label: 'Visão Geral' },
-            { id: 'expenses',   label: 'Despesas' },
-            { id: 'categories', label: 'Categorias' },
-            { id: 'reports',    label: 'Relatórios' },
-          ] as const).map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              style={{
-                padding: '13px 20px', fontSize: '13px', fontFamily: 'inherit',
-                fontWeight: activeTab === id ? 600 : 500,
-                color: activeTab === id ? '#1E3280' : '#6B7280',
-                borderBottom: `2px solid ${activeTab === id ? '#1E3280' : 'transparent'}`,
-                border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
-                transition: 'all 0.15s', whiteSpace: 'nowrap',
-              }}
-            >{label}</button>
-          ))}
+        {activeTab !== 'users' && activeTab !== 'settings' && (
+          <div style={{ backgroundColor: '#fff', borderBottom: '1px solid #E8E9EC', display: 'flex', alignItems: 'center' }} className="px-4 md:px-8">
+            {([
+              { id: 'overview',   label: 'Dashboard de Gastos' },
+              { id: 'expenses',   label: 'Despesas' },
+              { id: 'categories', label: 'Categorias' },
+              { id: 'reports',    label: 'Relatórios' },
+            ] as const).map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                style={{
+                  padding: '13px 20px', fontSize: '13px', fontFamily: 'inherit',
+                  fontWeight: activeTab === id ? 600 : 500,
+                  color: activeTab === id ? '#1E3280' : '#6B7280',
+                  borderBottom: `2px solid ${activeTab === id ? '#1E3280' : 'transparent'}`,
+                  border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
+                  transition: 'all 0.15s', whiteSpace: 'nowrap',
+                }}
+              >{label}</button>
+            ))}
 
-          {/* Right side: Contas a Pagar pill + date range */}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <DateRangeFilter
-              currentMonthName="Julho/2026"
-              isClosed={isMonthClosed}
-              onReset={handleResetFilters}
-            />
-            <button
-              onClick={() => { setLedgerMode('despesa'); setQuickFilter(quickFilter === 'payables' ? 'all' : 'payables'); if (quickFilter !== 'payables') setActiveTab('expenses'); }}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 13px', borderRadius: '99px', border: `1.5px solid ${quickFilter === 'payables' ? '#1E3280' : '#E5E7EB'}`, backgroundColor: quickFilter === 'payables' ? 'rgba(30,50,128,0.07)' : '#fff', color: quickFilter === 'payables' ? '#1E3280' : '#6B7280', fontSize: '11.5px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}
-            >
-              <CreditCard style={{ width: '12px', height: '12px' }} />
-              Contas a Pagar
-              {payablesStats.countPending + payablesStats.countOverdue > 0 && (
-                <span style={{ padding: '0 5px', borderRadius: '99px', backgroundColor: '#1E3280', color: '#fff', fontSize: '9.5px', fontWeight: 700, lineHeight: '16px' }}>
-                  {payablesStats.countPending + payablesStats.countOverdue}
-                </span>
-              )}
-            </button>
+            {/* Right side: Contas a Pagar pill + date range */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <DateRangeFilter
+                selectedRange={dateRangeOption}
+                onChangeRange={setDateRangeOption}
+                customStartDate={customStartDate}
+                customEndDate={customEndDate}
+                onChangeCustomDates={(start, end) => { setCustomStartDate(start); setCustomEndDate(end); }}
+              />
+              <button
+                onClick={() => { setLedgerMode('despesa'); setQuickFilter(quickFilter === 'payables' ? 'all' : 'payables'); if (quickFilter !== 'payables') setActiveTab('expenses'); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 13px', borderRadius: '99px', border: `1.5px solid ${quickFilter === 'payables' ? '#1E3280' : '#E5E7EB'}`, backgroundColor: quickFilter === 'payables' ? 'rgba(30,50,128,0.07)' : '#fff', color: quickFilter === 'payables' ? '#1E3280' : '#6B7280', fontSize: '11.5px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                <CreditCard style={{ width: '12px', height: '12px' }} />
+                Contas a Pagar
+                {payablesStats.countPending + payablesStats.countOverdue > 0 && (
+                  <span style={{ padding: '0 5px', borderRadius: '99px', backgroundColor: '#1E3280', color: '#fff', fontSize: '9.5px', fontWeight: 700, lineHeight: '16px' }}>
+                    {payablesStats.countPending + payablesStats.countOverdue}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ════════════ CONTENT AREA ════════════ */}
-        <div style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }} className="p-4 md:p-8">
 
-          {/* ─── TAB: VISÃO GERAL (Dashboard) ─── */}
+          {/* ─── TAB: VISÃO GERAL (Dashboard de Gastos) ─── */}
           {activeTab === 'overview' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1400px' }}>
 
-              {/* Options row */}
+              {/* Header section with toggle option */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Métricas · Julho/2026</p>
+                <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Indicadores Gerais</p>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', color: '#6B7280', fontWeight: 500, cursor: 'pointer' }}>
                   <input type="checkbox" checked={showRevenueSummary} onChange={(e) => setShowRevenueSummary(e.target.checked)} style={{ width: '14px', height: '14px', accentColor: '#1E3280', cursor: 'pointer' }} />
-                  Mostrar Receitas e Saldo
+                  Mostrar Receitas e Saldo de Caixa
                 </label>
               </div>
 
-              {/* Payables banner (when active) */}
+              {/* Payables banner (when quick filter payables is active) */}
               {quickFilter === 'payables' && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', padding: '18px 22px', backgroundColor: '#FFFBEF', borderRadius: '12px', border: '1px solid rgba(185,137,28,0.2)' }}>
                   <div>
@@ -831,9 +1006,8 @@ export default function FinancialDashboard() {
 
               {/* ── 5 Metric Cards ── */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
-
                 {/* Total Despesas */}
-                <div className="walltravel-panel walltravel-panel-hover" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px', cursor: 'default' }}>
+                <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Total Despesas</span>
                     <div style={{ width: '28px', height: '28px', borderRadius: '7px', backgroundColor: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -842,12 +1016,12 @@ export default function FinancialDashboard() {
                   </div>
                   <div>
                     <CurrencyValue value={-cardsData.totalExpenses} colorType="neutral" size="2xl" />
-                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '5px', fontWeight: 500 }}>Todas as contas</p>
+                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '5px', fontWeight: 500 }}>Lançadas no período</p>
                   </div>
                 </div>
 
                 {/* Pago */}
-                <div className="walltravel-panel walltravel-panel-hover" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px', cursor: 'default' }}>
+                <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Total Pago</span>
                     <div style={{ width: '28px', height: '28px', borderRadius: '7px', backgroundColor: '#EAF5F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -856,12 +1030,12 @@ export default function FinancialDashboard() {
                   </div>
                   <div>
                     <CurrencyValue value={-cardsData.paidExpenses} colorType="positive" size="2xl" />
-                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '5px', fontWeight: 500 }}>Contas quitadas</p>
+                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '5px', fontWeight: 500 }}>Contas liquidadas</p>
                   </div>
                 </div>
 
                 {/* Pendente */}
-                <div className="walltravel-panel walltravel-panel-hover" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px', cursor: 'default' }}>
+                <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Pendente</span>
                     <div style={{ width: '28px', height: '28px', borderRadius: '7px', backgroundColor: '#FFF8EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -875,7 +1049,7 @@ export default function FinancialDashboard() {
                 </div>
 
                 {/* Vencido */}
-                <div className="walltravel-panel walltravel-panel-hover" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px', cursor: 'default', borderLeft: '3px solid #B94A48' }}>
+                <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px', borderLeft: '3px solid #B94A48' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Vencido</span>
                     <div style={{ width: '28px', height: '28px', borderRadius: '7px', backgroundColor: '#FDF3F3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -884,12 +1058,12 @@ export default function FinancialDashboard() {
                   </div>
                   <div>
                     <CurrencyValue value={-cardsData.overdueExpenses} colorType="negative" size="2xl" />
-                    <p style={{ fontSize: '11px', color: '#B94A48', marginTop: '5px', fontWeight: 500 }}>Sem baixa / Atrasadas</p>
+                    <p style={{ fontSize: '11px', color: '#B94A48', marginTop: '5px', fontWeight: 500 }}>Contas atrasadas</p>
                   </div>
                 </div>
 
                 {/* Lançamentos */}
-                <div className="walltravel-panel walltravel-panel-hover" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px', cursor: 'default' }}>
+                <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Lançamentos</span>
                     <div style={{ width: '28px', height: '28px', borderRadius: '7px', backgroundColor: 'rgba(30,50,128,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -898,39 +1072,355 @@ export default function FinancialDashboard() {
                   </div>
                   <div>
                     <span style={{ fontSize: '28px', fontWeight: 800, color: '#1E3280', lineHeight: 1.1, display: 'block' }}>{cardsData.countExpenses}</span>
-                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '5px', fontWeight: 500 }}>{cardsData.countExpenses === 1 ? '1 registro' : `${cardsData.countExpenses} registros`}</p>
+                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '5px', fontWeight: 500 }}>{cardsData.countExpenses === 1 ? '1 despesa' : `${cardsData.countExpenses} despesas`}</p>
                   </div>
                 </div>
               </div>
 
               {/* Revenue cards (conditional) */}
               {showRevenueSummary && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
-                  <div className="walltravel-panel" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', animation: 'cebsFadeIn 0.2s ease forwards' }}>
+                  <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Receita Bruta do Mês</span>
                     <CurrencyValue value={cardsData.grossRevenue} colorType="positive" size="2xl" />
                     <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500 }}>{cardsData.countIncomes} recebimento(s)</p>
                   </div>
-                  <div className="walltravel-panel" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Resultado Líquido</span>
                     <CurrencyValue value={cardsData.grossRevenue - cardsData.paidExpenses} colorType="auto" size="2xl" />
-                    <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500 }}>Receitas − Despesas Pagas</p>
+                    <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500 }}>Balanço (Receitas − Despesas Pagas)</p>
                   </div>
                 </div>
               )}
 
-              {/* Category preview */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Gastos por Categoria</p>
-                  <button onClick={() => setActiveTab('expenses')} style={{ fontSize: '12px', color: '#1E3280', fontWeight: 600, border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>Ver todas as despesas →</button>
+              {/* ── CHARTS SECTION (2 columns) ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+
+                {/* Evolution & Status distribution */}
+                <div className="cebs-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                  
+                  {/* Status distribution bar */}
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Distribuição de Gastos por Status</h4>
+                    
+                    {/* Horizontal Segmented Bar */}
+                    <div style={{ height: '24px', borderRadius: '6px', overflow: 'hidden', display: 'flex', backgroundColor: '#E5E7EB', width: '100%', marginBottom: '14px' }}>
+                      {cardsData.totalExpenses > 0 ? (
+                        <>
+                          {cardsData.paidExpenses > 0 && (
+                            <div
+                              style={{ width: `${(cardsData.paidExpenses / cardsData.totalExpenses) * 100}%`, backgroundColor: '#2E7D57', transition: 'all 0.3s' }}
+                              title={`Pago: ${((cardsData.paidExpenses / cardsData.totalExpenses) * 100).toFixed(0)}%`}
+                            />
+                          )}
+                          {cardsData.pendingExpenses > 0 && (
+                            <div
+                              style={{ width: `${(cardsData.pendingExpenses / cardsData.totalExpenses) * 100}%`, backgroundColor: '#B9891C', transition: 'all 0.3s' }}
+                              title={`Pendente: ${((cardsData.pendingExpenses / cardsData.totalExpenses) * 100).toFixed(0)}%`}
+                            />
+                          )}
+                          {cardsData.overdueExpenses > 0 && (
+                            <div
+                              style={{ width: `${(cardsData.overdueExpenses / cardsData.totalExpenses) * 100}%`, backgroundColor: '#B94A48', transition: 'all 0.3s' }}
+                              title={`Vencido: ${((cardsData.overdueExpenses / cardsData.totalExpenses) * 100).toFixed(0)}%`}
+                            />
+                          )}
+                        </>
+                      ) : (
+                        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: '11px', fontWeight: 500 }}>Nenhuma despesa para exibir no período</div>
+                      )}
+                    </div>
+
+                    {/* Chart Legends */}
+                    <div style={{ display: 'flex', gap: '16px', fontSize: '11px', fontWeight: 600 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#2E7D57' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2E7D57' }} />
+                        Pago ({cardsData.totalExpenses > 0 ? ((cardsData.paidExpenses / cardsData.totalExpenses) * 100).toFixed(0) : 0}%)
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#B9891C' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#B9891C' }} />
+                        Pendente ({cardsData.totalExpenses > 0 ? ((cardsData.pendingExpenses / cardsData.totalExpenses) * 100).toFixed(0) : 0}%)
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#B94A48' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#B94A48' }} />
+                        Vencido ({cardsData.totalExpenses > 0 ? ((cardsData.overdueExpenses / cardsData.totalExpenses) * 100).toFixed(0) : 0}%)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{ height: '1px', backgroundColor: '#E5E7EB' }} />
+
+                  {/* Monthly Evolution Block */}
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '14px' }}>Evolução Mensal das Despesas</h4>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', height: '140px', padding: '10px 0 5px', borderBottom: '1.5px solid #E5E7EB' }}>
+                      {monthlyEvolution.map(m => {
+                        // Max value in monthly evolution to calculate bar height
+                        const maxVal = Math.max(...monthlyEvolution.map(x => x.value), 1000);
+                        const pctHeight = (m.value / maxVal) * 100;
+                        return (
+                          <div key={m.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '60px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#374151' }}>R$ {m.value.toFixed(0)}</span>
+                            
+                            {/* Bar item */}
+                            <div
+                              style={{
+                                width: '32px',
+                                height: `${Math.max(pctHeight, 4)}px`,
+                                backgroundColor: m.value > 0 ? '#1E3280' : '#E5E7EB',
+                                borderRadius: '4px 4px 0 0',
+                                transition: 'height 0.4s ease'
+                              }}
+                            />
+                            
+                            <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 600 }}>{m.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                 </div>
-                <CategoryCardsGrid
-                  categories={categories}
-                  expenses={expenses}
-                  selectedCategory={selectedCategoryName}
-                  onSelectCategory={(name) => { setSelectedCategoryName(name); setActiveTab('expenses'); }}
-                />
+
+                {/* Resumo por categoria */}
+                <div className="cebs-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Gastos por Categoria</h4>
+                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>Distribuição das despesas do período</p>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '270px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {categories.filter(c => c.type === 'despesa' && c.active).map(cat => {
+                      const amount = processedExpenses.filter(e => e.categoryId === cat.id && e.status !== 'cancelado').reduce((sum, e) => sum + e.amount, 0);
+                      const percentage = cardsData.totalExpenses > 0 ? (amount / cardsData.totalExpenses) * 100 : 0;
+                      if (amount === 0) return null;
+                      return (
+                        <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: 600 }}>
+                            <span style={{ color: '#4B5563' }}>{cat.name}</span>
+                            <span style={{ color: '#111827' }}>R$ {amount.toFixed(2)} <span style={{ color: '#9CA3AF', fontSize: '10px', marginLeft: '2px' }}>({percentage.toFixed(0)}%)</span></span>
+                          </div>
+                          
+                          {/* Progress bar container */}
+                          <div style={{ height: '6px', borderRadius: '99px', backgroundColor: '#F3F4F6', width: '100%', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${percentage}%`,
+                                backgroundColor: `var(--color-${cat.color}-primary, #1E3280)`,
+                                borderRadius: '99px'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Empty categories state */}
+                    {categories.filter(c => c.type === 'despesa').every(cat => processedExpenses.filter(e => e.categoryId === cat.id && e.status !== 'cancelado').reduce((s, e) => s + e.amount, 0) === 0) && (
+                      <p style={{ fontSize: '12px', color: '#9CA3AF', textAlign: 'center', padding: '24px 0' }}>Nenhuma despesa registrada para as categorias ativas.</p>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ── LATEST EXPENSES BLOCK ── */}
+              <div className="cebs-card" style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div>
+                    <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Últimas Despesas Lançadas</h4>
+                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>Atividade financeira recente</p>
+                  </div>
+                  <button onClick={() => setActiveTab('expenses')} style={{ fontSize: '12px', color: '#1E3280', fontWeight: 700, border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>Ver todo o livro →</button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1.5px solid #F3F4F6', fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <th style={{ padding: '10px 12px' }}>Descrição</th>
+                        <th style={{ padding: '10px 12px' }}>Categoria</th>
+                        <th style={{ padding: '10px 12px' }}>Vencimento</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'right' }}>Valor</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center' }}>Status</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'right' }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+                      {latestExpenses.map(exp => {
+                        const cat = categories.find(c => c.id === exp.categoryId);
+                        return (
+                          <tr key={exp.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                            <td style={{ padding: '12px' }}>
+                              <span style={{ fontWeight: 700, color: '#111827', display: 'block' }}>{exp.description}</span>
+                              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{exp.supplier}</span>
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '5px', fontSize: '11px', fontWeight: 600, color: `var(--color-${cat?.color || 'zinc'}-primary, #374151)`, backgroundColor: `var(--color-${cat?.color || 'zinc'}-dark, #F3F4F6)` }}>
+                                {cat?.name || 'Outros'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              {exp.dueDate.split('-').reverse().join('/')}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#B94A48' }}>
+                              -R$ {exp.amount.toFixed(2)}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                              <span style={{
+                                padding: '2px 8px', borderRadius: '99px', fontSize: '10.5px', fontWeight: 700,
+                                color: exp.status === 'pago' ? '#2E7D57' : exp.status === 'pendente' ? '#B9891C' : exp.status === 'atrasado' ? '#B94A48' : '#7A7E77',
+                                backgroundColor: exp.status === 'pago' ? '#EAF5F0' : exp.status === 'pendente' ? '#FFF8EB' : exp.status === 'atrasado' ? '#FDF3F3' : '#F3F4F6'
+                              }}>
+                                {exp.status === 'pago' ? 'Pago' : exp.status === 'pendente' ? 'Pendente' : exp.status === 'atrasado' ? 'Vencido' : 'Cancelado'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right' }}>
+                              <button
+                                onClick={() => handleViewDetails(exp.id, 'despesa')}
+                                style={{ padding: '4px 10px', fontSize: '11.5px', fontWeight: 600, color: '#1E3280', border: '1.5px solid #E5E7EB', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}
+                              >
+                                Visualizar
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {latestExpenses.length === 0 && (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#9CA3AF' }}>Nenhuma despesa cadastrada no período.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ─── TAB: USUÁRIOS ─── */}
+          {activeTab === 'users' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', animation: 'cebsFadeIn 0.2s ease' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#111827' }}>Gestão de Usuários</h3>
+                  <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500, marginTop: '2px' }}>Controle de operadores e níveis de acesso do CEBS Financeiro</p>
+                </div>
+                <button
+                  onClick={() => addToast('info', 'Acesso Restrito', 'Apenas a Direção Geral pode convidar novos membros neste MVP.')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #1E3280', backgroundColor: '#1E3280', color: '#fff', fontSize: '12px', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', boxShadow: '0 1px 3px rgba(30,50,128,0.25)' }}
+                >
+                  Convidar Membro
+                </button>
+              </div>
+
+              <div className="cebs-card" style={{ padding: '0px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1.5px solid #F3F4F6', fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#FAFBFD' }}>
+                      <th style={{ padding: '12px 20px' }}>Nome</th>
+                      <th style={{ padding: '12px 20px' }}>Email</th>
+                      <th style={{ padding: '12px 20px' }}>Cargo / Função</th>
+                      <th style={{ padding: '12px 20px' }}>Nível de Acesso</th>
+                      <th style={{ padding: '12px 20px', textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>
+                    {[
+                      { name: 'Maria Souza', email: 'diretoria@cebs.edu.br', role: 'Diretora Geral', access: 'Administrador', status: 'Ativo' },
+                      { name: 'Pedro Santos', email: 'pedro.financeiro@cebs.edu.br', role: 'Secretário Executivo', access: 'Operador', status: 'Ativo' },
+                      { name: 'Joana Lima', email: 'joana.auxiliar@cebs.edu.br', role: 'Auxiliar Financeira', access: 'Visualizador', status: 'Ativo' },
+                    ].map((usr, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                        <td style={{ padding: '14px 20px', fontWeight: 700, color: '#111827' }}>{usr.name}</td>
+                        <td style={{ padding: '14px 20px', color: '#6B7280' }}>{usr.email}</td>
+                        <td style={{ padding: '14px 20px' }}>{usr.role}</td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '5px', fontSize: '11px', fontWeight: 650, color: usr.access === 'Administrador' ? '#1E3280' : '#4B5563', backgroundColor: usr.access === 'Administrador' ? '#EAF2FF' : '#F3F4F6' }}>
+                            {usr.access}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '10.5px', fontWeight: 700, color: '#2E7D57', backgroundColor: '#EAF5F0' }}>
+                            {usr.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ─── TAB: CONFIGURAÇÕES ─── */}
+          {activeTab === 'settings' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', animation: 'cebsFadeIn 0.2s ease' }}>
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#111827' }}>Configurações Institucionais</h3>
+                <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500, marginTop: '2px' }}>Gerencie as preferências e informações do Centro Educacional Batista Sobrinho</p>
+              </div>
+
+              <div className="cebs-card" style={{ padding: '28px' }}>
+                <form onSubmit={(e) => { e.preventDefault(); addToast('success', 'Configurações Salvas', 'As preferências foram salvas com sucesso.'); }} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                  
+                  {/* Grid fields */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '18px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nome da Escola</label>
+                      <input type="text" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} required className="walltravel-input" style={{ fontSize: '13px', padding: '9px 12px' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nome Fantasia</label>
+                      <input type="text" value={schoolNickName} onChange={(e) => setSchoolNickName(e.target.value)} required className="walltravel-input" style={{ fontSize: '13px', padding: '9px 12px' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documento (CNPJ/INEP)</label>
+                      <input type="text" value={schoolDocument} onChange={(e) => setSchoolDocument(e.target.value)} className="walltravel-input" style={{ fontSize: '13px', padding: '9px 12px' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Telefone</label>
+                      <input type="text" value={schoolPhone} onChange={(e) => setSchoolPhone(e.target.value)} className="walltravel-input" style={{ fontSize: '13px', padding: '9px 12px' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: 'span 2' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>E-mail de Contato</label>
+                      <input type="email" value={schoolEmail} onChange={(e) => setSchoolEmail(e.target.value)} required className="walltravel-input" style={{ fontSize: '13px', padding: '9px 12px' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: 'span 2' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Centros de Custo (Separados por vírgula)</label>
+                      <input type="text" value={schoolCostCenters} onChange={(e) => setSchoolCostCenters(e.target.value)} className="walltravel-input" style={{ fontSize: '13px', padding: '9px 12px' }} />
+                      <p style={{ fontSize: '10.5px', color: '#9CA3AF', marginTop: '1px' }}>Essas opções serão disponibilizadas para classificação no lançamento de despesas.</p>
+                    </div>
+                  </div>
+
+                  {/* Section preferences */}
+                  <div style={{ height: '1px', backgroundColor: '#E5E7EB', margin: '6px 0' }} />
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <h4 style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Preferências Gerais</h4>
+                    
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#4B5563', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={schoolPrefAlerts} onChange={(e) => setSchoolPrefAlerts(e.target.checked)} style={{ width: '15px', height: '15px', accentColor: '#1E3280' }} />
+                      Ativar cálculo automático de despesas atrasadas no runtime
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#4B5563', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={schoolPrefCloseLock} onChange={(e) => setSchoolPrefCloseLock(e.target.checked)} style={{ width: '15px', height: '15px', accentColor: '#1E3280' }} />
+                      Bloquear qualquer edição/exclusão de despesas quando o mês estiver fechado
+                    </label>
+                  </div>
+
+                  {/* Submit row */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                    <button type="submit" style={{ padding: '8px 24px', borderRadius: '7px', border: '1.5px solid #1E3280', backgroundColor: '#1E3280', color: '#fff', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 1px 3px rgba(30,50,128,0.25)' }}>
+                      Salvar Alterações
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
@@ -1066,9 +1556,18 @@ export default function FinancialDashboard() {
           {/* ─── TAB: RELATÓRIOS ─── */}
           {activeTab === 'reports' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px' }}>
-              <div>
-                <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#111827' }}>Relatórios</h3>
-                <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500, marginTop: '2px' }}>Resumo financeiro do período atual</p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#111827' }}>Relatórios</h3>
+                  <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500, marginTop: '2px' }}>Resumo financeiro do período atual</p>
+                </div>
+                <button
+                  onClick={handleExportCSV}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #1E3280', backgroundColor: '#fff', color: '#1E3280', fontSize: '12px', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}
+                >
+                  <FileSpreadsheet style={{ width: '13px', height: '13px' }} />
+                  Exportar CSV
+                </button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
@@ -1153,654 +1652,6 @@ export default function FinancialDashboard() {
 
       {/* TOAST */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
-    </div>
-  );
-}
-
-
-      {/* ===================== SIDEBAR ===================== */}
-      <aside className="cebs-sidebar flex-shrink-0">
-        {/* Logo Area */}
-        <div className="px-4 py-5 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <img
-              src="/cebs-logo.png"
-              alt="Logo CEBS — Centro Educacional Batista Sobrinho"
-              className="w-12 h-12 object-contain flex-shrink-0"
-              style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))' }}
-            />
-            <div className="leading-tight min-w-0">
-              <div className="text-white font-black text-sm tracking-tight">CEBS</div>
-              <div className="text-white/60 font-medium text-[10px] tracking-wide uppercase">Financeiro</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Nav Menu */}
-        <nav className="flex-1 px-3 py-5 space-y-1">
-          <p className="text-white/35 text-[9px] font-bold uppercase tracking-widest px-2 pb-2">Menu</p>
-          <a href="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/10 text-white font-semibold text-sm transition-all">
-            <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
-            <span>Dashboard</span>
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/65 hover:bg-white/8 hover:text-white font-medium text-sm transition-all">
-            <Receipt className="w-4 h-4 flex-shrink-0" />
-            <span>Despesas</span>
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/65 hover:bg-white/8 hover:text-white font-medium text-sm transition-all">
-            <Tags className="w-4 h-4 flex-shrink-0" onClick={() => setIsCategoryManagerOpen(true)} />
-            <span onClick={() => setIsCategoryManagerOpen(true)}>Categorias</span>
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/65 hover:bg-white/8 hover:text-white font-medium text-sm transition-all">
-            <BarChart3 className="w-4 h-4 flex-shrink-0" />
-            <span>Relatórios</span>
-          </a>
-
-          <div className="pt-4">
-            <p className="text-white/35 text-[9px] font-bold uppercase tracking-widest px-2 pb-2">Conta</p>
-            <a href="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/65 hover:bg-white/8 hover:text-white font-medium text-sm transition-all">
-              <Users className="w-4 h-4 flex-shrink-0" />
-              <span>Usuários</span>
-            </a>
-            <a href="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/65 hover:bg-white/8 hover:text-white font-medium text-sm transition-all">
-              <Settings className="w-4 h-4 flex-shrink-0" />
-              <span>Configurações</span>
-            </a>
-          </div>
-        </nav>
-
-        {/* Sidebar Footer */}
-        <div className="px-5 py-4 border-t border-white/10">
-          <p className="text-white/35 text-[10px] font-medium leading-snug">Centro Educacional<br/>Batista Sobrinho</p>
-        </div>
-      </aside>
-
-      {/* ===================== MAIN CONTENT ===================== */}
-      <main className="cebs-main-content flex-1 flex flex-col">
-
-        {/* TOP HEADER BAR */}
-        <header className="bg-white border-b border-[#E6E1D6] px-8 py-4 flex items-center justify-between sticky top-0 z-30">
-          <div>
-            <h1 className="text-lg font-bold text-[#161616] tracking-tight">Dashboard de Despesas</h1>
-            <p className="text-xs text-[#666A63] font-medium mt-0.5">CEBS Financeiro · Competência: Julho/2026</p>
-          </div>
-          <div className="flex items-center gap-2.5">
-            {/* Reset */}
-            <button
-              onClick={handleResetToSeeds}
-              className="cebs-btn cebs-btn-ghost text-xs px-3 py-1.5"
-              title="Resetar dados de demonstração"
-            >
-              Limpar Dados
-            </button>
-
-            {/* Categorias */}
-            <button
-              onClick={() => setIsCategoryManagerOpen(true)}
-              className="cebs-btn cebs-btn-secondary text-xs px-4 py-2 flex items-center gap-1.5"
-            >
-              <Tags className="w-3.5 h-3.5" />
-              <span>Categorias</span>
-            </button>
-
-            {/* Contas a Pagar */}
-            <button
-              onClick={() => {
-                setLedgerMode('despesa');
-                setQuickFilter(quickFilter === 'payables' ? 'all' : 'payables');
-              }}
-              className={`cebs-btn text-xs px-4 py-2 flex items-center gap-1.5 ${
-                quickFilter === 'payables'
-                  ? 'bg-[rgba(37,58,138,0.08)] text-[#253A8A] border border-[rgba(37,58,138,0.2)]'
-                  : 'cebs-btn-secondary'
-              }`}
-            >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span>Contas a Pagar</span>
-              {payablesStats.countPending + payablesStats.countOverdue > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 text-[9px] font-black rounded-full bg-[#253A8A] text-white leading-none">
-                  {payablesStats.countPending + payablesStats.countOverdue}
-                </span>
-              )}
-            </button>
-
-            {/* Nova Receita */}
-            <button
-              onClick={() => { setEditingTransaction(null); setIsIncomeFormOpen(true); }}
-              disabled={isMonthClosed}
-              className="cebs-btn cebs-btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 disabled:opacity-40"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>Nova Receita</span>
-            </button>
-
-            {/* Nova Despesa */}
-            <button
-              onClick={() => { setEditingTransaction(null); setIsExpenseFormOpen(true); }}
-              disabled={isMonthClosed}
-              className="cebs-btn cebs-btn-primary text-xs px-4 py-2 flex items-center gap-1.5 disabled:opacity-40"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>Nova Despesa</span>
-            </button>
-          </div>
-        </header>
-
-        {/* PAGE BODY */}
-        <div className="flex-1 px-8 py-8 space-y-8" style={{ maxWidth: '1440px', width: '100%' }}>
-
-      {/* 2. Actions & Filters Line (Restructured to match print layout row) */}
-      <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-1">
-        {/* Left Side: Filter and Month link */}
-        <DateRangeFilter
-          currentMonthName="Julho/2026"
-          isClosed={isMonthClosed}
-          onReset={handleResetFilters}
-        />
-
-        {/* Right Side: Month Closing Status & Lock Button */}
-        <div className="flex items-center gap-3.5 self-end sm:self-auto">
-          {/* Status Badge: red/pink style for open month, green style for closed */}
-          <div className={`flex items-center gap-2.5 px-4.5 py-2.5 text-xs md:text-sm font-black rounded-full border shadow-3xs ${
-            isMonthClosed 
-              ? 'bg-status-success-bg border-status-success-border text-status-success-text'
-              : 'bg-status-overdue-bg border-status-overdue-border text-status-overdue-text'
-          }`}>
-            <span className={`w-2.5 h-2.5 rounded-full ${
-              isMonthClosed ? 'bg-status-success-text animate-pulse' : 'bg-status-overdue-text'
-            }`} />
-            <span>
-              {isMonthClosed ? 'Julho/2026 fechado' : 'Julho/2026 não fechado'}
-            </span>
-          </div>
-
-          {/* Lock Action Trigger */}
-          {isMonthClosed ? (
-            <button
-              onClick={handleReopenMonthConfirm}
-              className="px-5 py-2.5 text-xs md:text-sm font-bold rounded-lg border border-[#E4DFD2] bg-white text-[#161616] hover:bg-[#F7F5EE] shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
-            >
-              <Unlock className="w-4 h-4 text-[#5F6259]" />
-              <span>Reabrir mês</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsCloseMonthModalOpen(true)}
-              className="px-5 py-2.5 text-xs md:text-sm font-bold rounded-lg border border-[#E4DFD2] bg-white text-[#161616] hover:bg-[#F7F5EE] shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
-            >
-              <Lock className="w-4 h-4 text-[#5F6259]" />
-              <span>Fechar mês</span>
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* Accounts Payable Dashboard Panel (Open Filter warning) */}
-      {quickFilter === 'payables' && (
-        <section className="p-7 rounded-xl border border-status-pending-border bg-status-pending-bg/50 grid grid-cols-2 md:grid-cols-4 gap-6 text-[#161616] animate-in fade-in slide-in-from-top-2 duration-300 shadow-xs">
-          <div className="space-y-1.5 text-left">
-            <span className="text-[11px] md:text-xs text-[#5F6259] uppercase tracking-wider font-extrabold">Total a Pagar (Prazo)</span>
-            <div className="flex items-center gap-2 mt-0.5">
-              <Clock className="w-6 h-6 text-status-pending-text" />
-              <CurrencyValue value={-payablesStats.totalToPay} colorType="neutral" size="lg" className="font-extrabold" />
-            </div>
-            <p className="text-[10px] md:text-xs text-[#5F6259] font-bold">{payablesStats.countPending} contas a vencer</p>
-          </div>
-
-          <div className="space-y-1.5 text-left">
-            <span className="text-[11px] md:text-xs text-[#5F6259] uppercase tracking-wider font-extrabold">Total em Atraso</span>
-            <div className="flex items-center gap-2 mt-0.5">
-              <AlertTriangle className="w-6 h-6 text-status-overdue-text" />
-              <CurrencyValue value={-payablesStats.totalOverdue} colorType="negative" size="lg" />
-            </div>
-            <p className="text-[10px] md:text-xs text-status-overdue-text font-bold">{payablesStats.countOverdue} contas vencidas</p>
-          </div>
-
-          <div className="space-y-1.5 text-left">
-            <span className="text-[11px] md:text-xs text-[#5F6259] uppercase tracking-wider font-extrabold">Saldo Caixa Atual</span>
-            <div className="flex items-center gap-2 mt-0.5">
-              <Scale className="w-6 h-6 text-status-success-text" />
-              <CurrencyValue value={cardsData.grossRevenue - cardsData.paidExpenses} colorType="auto" size="lg" />
-            </div>
-            <p className="text-[10px] md:text-xs text-[#5F6259] font-bold">Balanço líquido real</p>
-          </div>
-
-          <div className="space-y-1.5 text-left">
-            <span className="text-[11px] md:text-xs text-[#5F6259] uppercase tracking-wider font-extrabold">Status Operacional</span>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${isMonthClosed ? 'bg-status-overdue-text' : 'bg-status-success-text'}`} />
-              <span className="text-sm font-black text-[#161616]">
-                {isMonthClosed ? 'Competência Trancada' : 'Fluxo Aberto'}
-              </span>
-            </div>
-            <p className="text-[10px] md:text-xs text-[#5F6259] font-bold">Julho/2026</p>
-          </div>
-        </section>
-      )}
-
-      {/* Section Indicator and Toggle */}
-      <div className="flex items-center justify-between mt-2 pt-2">
-        <h4 className="text-sm font-extrabold text-[#5F6259] uppercase tracking-wider font-sans">
-          Métricas de Despesas do Mês
-        </h4>
-        <label className="flex items-center gap-2 text-xs font-bold text-[#5F6259] cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={showRevenueSummary}
-            onChange={(e) => setShowRevenueSummary(e.target.checked)}
-            className="rounded border-[#E4DFD2] text-[#173B72] focus:ring-[#173B72] w-4 h-4 cursor-pointer"
-          />
-          <span>Mostrar Receitas e Saldo</span>
-        </label>
-      </div>
-
-      {/* 3. Summary Cards (Cohesive block of clean school dashboard metrics) */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-        {/* Card 1: Total de despesas do mês */}
-        <div className="walltravel-panel p-7 flex flex-col justify-between h-[165px] walltravel-panel-hover transition-all text-left">
-          <div className="flex items-start justify-between text-[#6B6B63]">
-            <span className="text-[12px] font-black uppercase tracking-wider font-sans text-slate-500">Total Despesas do Mês</span>
-            <div className="text-slate-400 font-bold text-lg select-none">$</div>
-          </div>
-          <div className="mt-auto">
-            <CurrencyValue value={-cardsData.totalExpenses} colorType="neutral" size="3xl" className="text-[#161616] font-extrabold" />
-            <p className="text-[12px] text-[#6B6B63] font-semibold mt-2.5 leading-none">
-              Soma de todas as contas
-            </p>
-          </div>
-        </div>
-
-        {/* Card 2: Total Pago */}
-        <div className="walltravel-panel p-7 flex flex-col justify-between h-[165px] walltravel-panel-hover transition-all text-left">
-          <div className="flex items-start justify-between text-[#6B6B63]">
-            <span className="text-[12px] font-black uppercase tracking-wider font-sans text-slate-500">Total Pago</span>
-            <div className="text-slate-400">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-auto">
-            <CurrencyValue value={-cardsData.paidExpenses} colorType="positive" size="3xl" />
-            <p className="text-[12px] text-[#6B6B63] font-semibold mt-2.5 leading-none">
-              Contas quitadas no mês
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3: Total Pendente */}
-        <div className="walltravel-panel p-7 flex flex-col justify-between h-[165px] walltravel-panel-hover transition-all text-left">
-          <div className="flex items-start justify-between text-[#6B6B63]">
-            <span className="text-[12px] font-black uppercase tracking-wider font-sans text-slate-500">Total Pendente</span>
-            <div className="text-slate-400">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-auto">
-            <CurrencyValue value={-cardsData.pendingExpenses} colorType="neutral" size="3xl" className="text-status-pending-text font-extrabold" />
-            <p className="text-[12px] text-[#6B6B63] font-semibold mt-2.5 leading-none">A vencer no prazo</p>
-          </div>
-        </div>
-
-        {/* Card 4: Total Vencido */}
-        <div className="walltravel-panel p-7 flex flex-col justify-between h-[165px] walltravel-panel-hover transition-all text-left">
-          <div className="flex items-start justify-between text-[#6B6B63]">
-            <span className="text-[12px] font-black uppercase tracking-wider font-sans text-slate-500">Total Vencido</span>
-            <div className="text-slate-400">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-auto">
-            <CurrencyValue value={-cardsData.overdueExpenses} colorType="negative" size="3xl" />
-            <p className="text-[12px] text-status-overdue-text font-semibold mt-2.5 leading-none">Atrasadas / Sem baixa</p>
-          </div>
-        </div>
-
-        {/* Card 5: Quantidade de despesas cadastradas */}
-        <div className="walltravel-panel p-7 flex flex-col justify-between h-[165px] walltravel-panel-hover transition-all text-left">
-          <div className="flex items-start justify-between text-[#6B6B63]">
-            <span className="text-[12px] font-black uppercase tracking-wider font-sans text-slate-500">Despesas Cadastradas</span>
-            <div className="text-slate-400">
-              <FolderOpen className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-auto">
-            <span className="text-[32px] font-black text-brand-accent leading-tight">
-              {cardsData.countExpenses}
-            </span>
-            <p className="text-[12px] text-[#6B6B63] font-semibold mt-2.5 leading-none">
-              {cardsData.countExpenses === 1 ? '1 lançamento' : `${cardsData.countExpenses} lançamentos`}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Secondary Row: Revenue indicators if showRevenueSummary is checked */}
-      {showRevenueSummary && (
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          {/* Receitas Card */}
-          <div className="walltravel-panel p-7 flex flex-col justify-between h-[150px] walltravel-panel-hover transition-all text-left">
-            <div className="flex items-start justify-between text-[#6B6B63]">
-              <span className="text-[12px] font-black uppercase tracking-wider font-sans text-slate-500">Receita Bruta do Mês</span>
-              <div className="text-slate-400 font-bold text-lg select-none">$</div>
-            </div>
-            <div className="mt-auto">
-              <CurrencyValue value={cardsData.grossRevenue} colorType="positive" size="3xl" />
-              <p className="text-[12px] text-[#6B6B63] font-semibold mt-2 leading-none">
-                {cardsData.countIncomes} {cardsData.countIncomes === 1 ? 'recebimento' : 'recebimentos'} no período
-              </p>
-            </div>
-          </div>
-
-          {/* Resultado Líquido */}
-          <div className="walltravel-panel p-7 flex flex-col justify-between h-[150px] walltravel-panel-hover transition-all text-left">
-            <div className="flex items-start justify-between text-[#6B6B63]">
-              <span className="text-[12px] font-black uppercase tracking-wider text-slate-500 font-title">Resultado Líquido</span>
-              <div className="text-slate-400">
-                <Scale className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-auto">
-              <CurrencyValue value={cardsData.grossRevenue - cardsData.paidExpenses} colorType="auto" size="3xl" className="text-status-success-text" />
-              <p className="text-[12px] text-[#6B6B63] font-semibold mt-2 leading-none">
-                Balanço real (Receitas - Despesas Pagas)
-              </p>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 4. Categories Section */}
-      <section className="pt-2">
-        <CategoryCardsGrid
-          categories={categories}
-          expenses={expenses}
-          selectedCategory={selectedCategoryName}
-          onSelectCategory={setSelectedCategoryName}
-        />
-      </section>
-
-      {/* 5. Tabela / Livro de Despesas (Spacious visual restructuration) */}
-      <section className="space-y-6 pt-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="text-left font-sans space-y-1">
-            <h3 className="text-xl font-extrabold text-[#161616] tracking-wide flex items-center gap-2.5 font-title">
-              <ArrowRightLeft className="w-5.5 h-5.5 text-brand-accent" />
-              <span>
-                {quickFilter === 'payables' 
-                  ? 'Contas a Pagar (Despesas Unpaid)' 
-                  : (ledgerMode === 'despesa' ? 'Livro de Despesas Escolares' : 'Livro de Receitas / Entradas')
-                }
-              </span>
-              {selectedCategoryName && (
-                <span className="text-xs md:text-sm font-bold px-3 py-1 rounded-lg bg-[#EAF2FF] text-[#173B72] border border-[#D8E7FF]">
-                  {selectedCategoryName}
-                </span>
-              )}
-            </h3>
-            <p className="text-sm text-[#6B6B63] font-semibold">
-              Gestão de lançamentos para liquidação, conciliação e relatórios de fluxo
-            </p>
-          </div>
-          
-          {/* Tabs switch (Larger text and padding) */}
-          <div className="flex items-center gap-1.5 text-xs md:text-sm font-bold text-[#6B6B63] bg-white border border-[#E6E1D6] rounded-lg p-1.5 shadow-xs font-sans">
-            <button
-              onClick={() => {
-                setLedgerMode('despesa');
-                setQuickFilter('all');
-              }}
-              className={`px-5 py-2.5 rounded-md transition-all cursor-pointer ${
-                ledgerMode === 'despesa' && quickFilter === 'all' 
-                  ? 'bg-brand-accent text-white font-bold shadow-sm' 
-                  : 'hover:text-[#161616]'
-              }`}
-            >
-              Despesas
-            </button>
-            
-            <button
-              onClick={() => {
-                setLedgerMode('receita');
-                setQuickFilter('all');
-              }}
-              className={`px-5 py-2.5 rounded-md transition-all cursor-pointer ${
-                ledgerMode === 'receita'
-                  ? 'bg-brand-accent text-white font-bold shadow-sm' 
-                  : 'hover:text-[#161616]'
-              }`}
-            >
-              Receitas
-            </button>
-          </div>
-        </div>
-
-        {/* Search & Advanced Filters Panel (Notion/Stripe SaaS style) */}
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* Search query input */}
-            <div className="relative flex-1 w-full">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Pesquisar por descrição ou fornecedor/origem..."
-                className="w-full walltravel-input pl-4 pr-10 py-3.5 text-sm font-semibold"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-4 text-xs font-bold text-[#6B6B63] hover:text-[#161616] cursor-pointer"
-                >
-                  Limpar
-                </button>
-              )}
-            </div>
-
-            {/* Toggle advanced filters */}
-            <button
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`px-5 py-3.5 text-xs md:text-sm font-bold rounded-lg border border-[#E6E1D6] shadow-2xs flex items-center gap-2 cursor-pointer transition-colors ${
-                showAdvancedFilters ? 'bg-[#EAF2FF] text-[#173B72] border-[#173B72]' : 'bg-white text-[#6B6B63] hover:bg-[#F8F7F2]'
-              }`}
-            >
-              <ListFilter className="w-4.5 h-4.5 text-brand-accent" />
-              <span>Filtros Avançados</span>
-              {(statusFilter !== 'all' || paymentMethodFilter !== 'all' || costCenterFilter.trim() || minAmountFilter || maxAmountFilter) && (
-                <span className="w-2 h-2 rounded-full bg-[#173B72] block" />
-              )}
-            </button>
-
-            {/* Reset all filters (if any is active) */}
-            {(selectedCategoryName || quickFilter !== 'all' || searchQuery || statusFilter !== 'all' || paymentMethodFilter !== 'all' || costCenterFilter.trim() || minAmountFilter || maxAmountFilter) && (
-              <button
-                onClick={handleResetFilters}
-                className="px-5 py-3.5 text-xs md:text-sm font-bold rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
-              >
-                <FilterX className="w-4 h-4 text-slate-500" />
-                <span>Limpar Filtros</span>
-              </button>
-            )}
-          </div>
-
-          {/* Advanced filter dropdown details */}
-          {showAdvancedFilters && (
-            <div className="p-5.5 rounded-lg border border-[#E6E1D6] bg-white grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4.5 animate-in fade-in slide-in-from-top-2 duration-200">
-              {/* Status Filter */}
-              <div className="space-y-1.5 text-left">
-                <span className="text-[10px] font-bold text-[#6B6B63] uppercase tracking-wide">Filtrar por Status</span>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="w-full walltravel-input px-3.5 py-2 text-xs font-semibold"
-                >
-                  <option value="all">Todos os Status</option>
-                  <option value="pendente">Pendente</option>
-                  <option value="atrasado">Vencida</option>
-                  <option value="pago">Paga</option>
-                  <option value="cancelado">Cancelada</option>
-                </select>
-              </div>
-
-              {/* Payment Method */}
-              <div className="space-y-1.5 text-left">
-                <span className="text-[10px] font-bold text-[#6B6B63] uppercase tracking-wide">Forma de Pagamento</span>
-                <select
-                  value={paymentMethodFilter}
-                  onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                  className="w-full walltravel-input px-3.5 py-2 text-xs font-semibold"
-                >
-                  <option value="all">Todas as formas</option>
-                  {['PIX', 'Cartão', 'Boleto', 'Dinheiro', 'Transferência', 'Débito automático', 'Outro'].map(pm => (
-                    <option key={pm} value={pm}>{pm}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Cost Center */}
-              <div className="space-y-1.5 text-left">
-                <span className="text-[10px] font-bold text-[#6B6B63] uppercase tracking-wide">Centro de Custo</span>
-                <input
-                  type="text"
-                  value={costCenterFilter}
-                  onChange={(e) => setCostCenterFilter(e.target.value)}
-                  placeholder="Filtrar centro..."
-                  className="w-full walltravel-input px-3.5 py-2 text-xs font-semibold"
-                />
-              </div>
-
-              {/* Price range */}
-              <div className="space-y-1.5 text-left">
-                <span className="text-[10px] font-bold text-[#6B6B63] uppercase tracking-wide">Intervalo de Valor (R$)</span>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    value={minAmountFilter}
-                    onChange={(e) => setMinAmountFilter(e.target.value)}
-                    placeholder="Mín"
-                    className="w-full walltravel-input px-3.5 py-2 text-xs font-semibold"
-                  />
-                  <span className="text-slate-400 font-bold text-xs">-</span>
-                  <input
-                    type="number"
-                    value={maxAmountFilter}
-                    onChange={(e) => setMaxAmountFilter(e.target.value)}
-                    placeholder="Máx"
-                    className="w-full walltravel-input px-3.5 py-2 text-xs font-semibold"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <ExpensesTable
-          categories={categories}
-          expenses={filteredExpenses}
-          incomes={filteredIncomes}
-          mode={ledgerMode}
-          onPay={handlePayTrigger}
-          onEdit={handleEditTrigger}
-          onDelete={handleDeleteTrigger}
-          onViewDetails={handleViewDetails}
-          onClearFilter={selectedCategoryName || quickFilter !== 'all' ? handleResetFilters : undefined}
-          isMonthClosed={isMonthClosed}
-          onTriggerAdd={() => {
-            setEditingTransaction(null);
-            if (ledgerMode === 'despesa') setIsExpenseFormOpen(true);
-            else setIsIncomeFormOpen(true);
-          }}
-        />
-      </section>
-
-      {/* MODALS RENDER */}
-      
-      {/* 1. Expense Form Modal */}
-      <ExpenseFormModal
-        isOpen={isExpenseFormOpen}
-        onClose={() => setIsExpenseFormOpen(false)}
-        onSubmit={handleSaveExpense}
-        categories={categories}
-        editingExpense={editingTransaction}
-        onAddCategoryInline={handleAddCategoryInline}
-      />
-
-      {/* 2. Income Form Modal */}
-      <IncomeFormModal
-        isOpen={isIncomeFormOpen}
-        onClose={() => setIsIncomeFormOpen(false)}
-        onSubmit={handleSaveIncome}
-        categories={categories}
-        editingIncome={editingTransaction}
-        onAddCategoryInline={handleAddCategoryInline}
-      />
-
-      {/* 3. Category Manager Modal */}
-      <CategoryManagerModal
-        isOpen={isCategoryManagerOpen}
-        onClose={() => setIsCategoryManagerOpen(false)}
-        categories={categories}
-        expenses={expenses}
-        incomes={incomes}
-        onAddCategory={handleAddCategory}
-        onUpdateCategory={handleUpdateCategory}
-        onDeleteCategory={handleDeleteCategory}
-      />
-
-      {/* 4. Details Modal */}
-      <DetailsModal
-        isOpen={!!selectedDetailTransaction}
-        onClose={() => setSelectedDetailTransaction(null)}
-        transaction={selectedDetailTransaction}
-        categories={categories}
-        onPay={handlePayTrigger}
-        onDelete={(id) => handleDeleteTrigger(id, selectedDetailTransaction?.type === 'receita' ? 'receita' : 'despesa')}
-        onCancel={handleCancelExpense}
-      />
-
-      {/* 5. Close Month Modal */}
-      <CloseMonthModal
-        isOpen={isCloseMonthModalOpen}
-        onClose={() => setIsCloseMonthModalOpen(false)}
-        expenses={expenses}
-        incomes={incomes}
-        onConfirm={handleCloseMonthConfirm}
-      />
-
-      {/* 6. Closed Month Alert Warning */}
-      <ClosedMonthAlert
-        isOpen={closedMonthAlertTriggered}
-        onClose={() => setClosedMonthAlertTriggered(false)}
-        onReopen={handleReopenMonthConfirm}
-      />
-
-      {/* 7. Payment Confirmation Dialog */}
-      <PaymentConfirmationModal
-        isOpen={paymentConfirmState.isOpen}
-        onClose={() => setPaymentConfirmState({ isOpen: false, expense: null })}
-        onConfirm={handlePayConfirm}
-        transaction={paymentConfirmState.expense}
-      />
-
-      {/* 8. Deletion Confirmation Dialog */}
-      <ConfirmDeleteModal
-        isOpen={deleteConfirmState.isOpen}
-        onClose={() => setDeleteConfirmState(prev => ({ ...prev, isOpen: false }))}
-        onConfirm={deleteConfirmState.onConfirm}
-        title={deleteConfirmState.title}
-        itemName={deleteConfirmState.itemName}
-        warningText={deleteConfirmState.warningText}
-      />
-
-      {/* TOAST SYSTEM */}
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
-
-      {/* Footer */}
-      <footer className="mt-8 pt-6 border-t border-[#E6E1D6] flex items-center justify-between">
-        <span className="text-[11px] text-[#9CA3AF] font-medium">CEBS Financeiro &copy; 2026 · Centro Educacional Batista Sobrinho</span>
-        <span className="text-[11px] text-[#9CA3AF] font-medium">Competência: Julho/2026</span>
-      </footer>
-
-        </div>
-      </main>
     </div>
   );
 }

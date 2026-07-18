@@ -56,6 +56,36 @@
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 18px;
+
+  /* Category colors - primary (text/icon) and dark (background) */
+  --color-indigo-primary: #3F51B5;
+  --color-indigo-dark: #E8EAF6;
+  --color-amber-primary: #D84315;
+  --color-amber-dark: #FFF3E0;
+  --color-yellow-primary: #B7891C;
+  --color-yellow-dark: #FFFDE7;
+  --color-sky-primary: #0288D1;
+  --color-sky-dark: #E1F5FE;
+  --color-blue-primary: #1565C0;
+  --color-blue-dark: #E3F2FD;
+  --color-orange-primary: #E65100;
+  --color-orange-dark: #FFE0B2;
+  --color-pink-primary: #C2185B;
+  --color-pink-dark: #FCE4EC;
+  --color-red-primary: #C62828;
+  --color-red-dark: #FFEBEE;
+  --color-cyan-primary: #00838F;
+  --color-cyan-dark: #E0F7FA;
+  --color-rose-primary: #D81B60;
+  --color-rose-dark: #FCE4EC;
+  --color-teal-primary: #00695C;
+  --color-teal-dark: #E0F2F1;
+  --color-violet-primary: #6A1B9A;
+  --color-violet-dark: #F3E5F5;
+  --color-fuchsia-primary: #880E4F;
+  --color-fuchsia-dark: #FCE4EC;
+  --color-zinc-primary: #374151;
+  --color-zinc-dark: #F3F4F6;
 }
 
 /* ============================================================
