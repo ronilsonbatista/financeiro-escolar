@@ -1,26 +1,345 @@
-@import "tailwindcss";
+/* ============================================================
+   CEBS Financeiro — Centro Educacional Batista Sobrinho
+   Design System v2 — Paleta Institucional
+   Tailwind CSS via CDN (layout.tsx)
+   ============================================================ */
 
+/* CSS Custom Properties — Paleta CEBS */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds */
+  --bg-main: #F8F7F2;
+  --bg-card: #FFFFFF;
+  --bg-sidebar: #253A8A;
+
+  /* Brand Colors */
+  --brand-blue: #253A8A;       /* Azul institucional principal */
+  --brand-blue-hover: #1C2E70; /* Hover do azul */
+  --brand-blue-light: #19A7E0; /* Azul claro de apoio */
+  --brand-yellow: #F0DB2D;     /* Amarelo destaque */
+
+  /* Text */
+  --text-primary: #161616;
+  --text-secondary: #666A63;
+  --text-muted: #9CA3AF;
+  --text-on-brand: #FFFFFF;
+
+  /* Borders */
+  --border-light: #E6E1D6;
+  --border-medium: #D5CFC5;
+
+  /* Status — Pago / Sucesso */
+  --status-success-bg: #EAF5F0;
+  --status-success-text: #2E7D57;
+  --status-success-border: rgba(46, 125, 87, 0.15);
+
+  /* Status — Pendente */
+  --status-pending-bg: #FFF8EB;
+  --status-pending-text: #B9891C;
+  --status-pending-border: rgba(185, 137, 28, 0.15);
+
+  /* Status — Vencido / Erro */
+  --status-overdue-bg: #FDF3F3;
+  --status-overdue-text: #B94A48;
+  --status-overdue-border: rgba(185, 74, 72, 0.15);
+
+  /* Status — Cancelado */
+  --status-cancelled-bg: #F3F4F6;
+  --status-cancelled-text: #7A7E77;
+  --status-cancelled-border: rgba(122, 126, 119, 0.15);
+
+  /* Shadows */
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 15px;
+  line-height: 1.5;
 }
+
+/* ============================================================
+   SCROLLBAR CUSTOM
+   ============================================================ */
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: var(--bg-main); }
+::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand-blue); }
+
+/* ============================================================
+   LAYOUT — APP SHELL
+   ============================================================ */
+
+/* Sidebar */
+.cebs-sidebar {
+  width: 240px;
+  min-height: 100vh;
+  background-color: var(--brand-blue);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 40;
+  overflow-y: auto;
+}
+
+.cebs-main-content {
+  margin-left: 240px;
+  min-height: 100vh;
+  background-color: var(--bg-main);
+}
+
+/* ============================================================
+   CARDS / PANELS
+   ============================================================ */
+
+.cebs-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.cebs-card:hover {
+  border-color: rgba(37, 58, 138, 0.15);
+  box-shadow: 0 4px 16px rgba(37, 58, 138, 0.08);
+}
+
+/* ============================================================
+   INPUTS
+   ============================================================ */
+
+.cebs-input {
+  background: #FFFFFF;
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  padding: 0.6rem 0.875rem;
+}
+
+.cebs-input:focus {
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 3px rgba(37, 58, 138, 0.1);
+}
+
+.cebs-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+.cebs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1.25rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1.5px solid transparent;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.cebs-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Primary — Azul institucional */
+.cebs-btn-primary {
+  background-color: var(--brand-blue);
+  color: #FFFFFF;
+  border-color: var(--brand-blue);
+}
+.cebs-btn-primary:hover:not(:disabled) {
+  background-color: var(--brand-blue-hover);
+  border-color: var(--brand-blue-hover);
+  box-shadow: 0 2px 8px rgba(37, 58, 138, 0.2);
+}
+
+/* Secondary — Branco com borda */
+.cebs-btn-secondary {
+  background-color: #FFFFFF;
+  color: var(--brand-blue);
+  border-color: var(--border-light);
+}
+.cebs-btn-secondary:hover:not(:disabled) {
+  background-color: #F5F4EF;
+  border-color: var(--border-medium);
+}
+
+/* Ghost — Sem fundo */
+.cebs-btn-ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+.cebs-btn-ghost:hover:not(:disabled) {
+  background-color: rgba(37, 58, 138, 0.06);
+  color: var(--brand-blue);
+}
+
+/* Danger */
+.cebs-btn-danger {
+  background-color: #FFFFFF;
+  color: var(--status-overdue-text);
+  border-color: rgba(185, 74, 72, 0.25);
+}
+.cebs-btn-danger:hover:not(:disabled) {
+  background-color: var(--status-overdue-bg);
+  border-color: rgba(185, 74, 72, 0.4);
+}
+
+/* ============================================================
+   BADGES / STATUS
+   ============================================================ */
+
+.cebs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 99px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.cebs-badge-success {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-color: var(--status-success-border);
+}
+.cebs-badge-pending {
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+  border-color: var(--status-pending-border);
+}
+.cebs-badge-overdue {
+  background: var(--status-overdue-bg);
+  color: var(--status-overdue-text);
+  border-color: var(--status-overdue-border);
+}
+.cebs-badge-cancelled {
+  background: var(--status-cancelled-bg);
+  color: var(--status-cancelled-text);
+  border-color: var(--status-cancelled-border);
+}
+.cebs-badge-blue {
+  background: rgba(37, 58, 138, 0.08);
+  color: var(--brand-blue);
+  border-color: rgba(37, 58, 138, 0.15);
+}
+
+/* ============================================================
+   LEGACY ALIASES (backwards compat with existing components)
+   ============================================================ */
+
+/* Keep old class names working during migration */
+.walltravel-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-md);
+}
+.walltravel-panel-hover:hover {
+  border-color: rgba(37, 58, 138, 0.18);
+  box-shadow: 0 4px 16px rgba(37, 58, 138, 0.08);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+.walltravel-input {
+  background: #FFFFFF;
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.15s;
+}
+.walltravel-input:focus {
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 3px rgba(37, 58, 138, 0.1);
+}
+
+/* Button legacy aliases */
+.btn-wt-primary { background-color: var(--brand-blue); color: #FFF; border: 1.5px solid var(--brand-blue); border-radius: var(--radius-sm); font-weight: 700; padding: 0.625rem 1.25rem; font-size: 0.875rem; transition: all 0.15s; font-family: inherit; }
+.btn-wt-primary:hover:not(:disabled) { background-color: var(--brand-blue-hover); border-color: var(--brand-blue-hover); box-shadow: 0 2px 8px rgba(37, 58, 138, 0.2); }
+.btn-wt-secondary { background-color: #FFF; color: var(--brand-blue); border: 1.5px solid var(--border-light); border-radius: var(--radius-sm); font-weight: 700; padding: 0.625rem 1.25rem; font-size: 0.875rem; transition: all 0.15s; font-family: inherit; }
+.btn-wt-secondary:hover:not(:disabled) { background-color: #F5F4EF; border-color: var(--border-medium); }
+.btn-wt-gold { background-color: #FFF; color: var(--brand-blue); border: 1.5px solid var(--border-light); border-radius: var(--radius-sm); font-weight: 700; padding: 0.625rem 1.25rem; font-size: 0.875rem; transition: all 0.15s; font-family: inherit; }
+.btn-wt-gold:hover:not(:disabled) { background-color: #F5F4EF; }
+.btn-wt-green { background-color: #FFF; color: var(--brand-blue); border: 1.5px solid var(--border-light); border-radius: var(--radius-sm); font-weight: 700; padding: 0.625rem 1.25rem; font-size: 0.875rem; transition: all 0.15s; font-family: inherit; }
+.btn-wt-green:hover:not(:disabled) { background-color: #F5F4EF; }
+
+/* ============================================================
+   TRANSITIONS / ANIMATIONS
+   ============================================================ */
+
+.cebs-fade-in {
+  animation: cebsFadeIn 0.2s ease forwards;
+}
+
+@keyframes cebsFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Tailwind-compatible animation classes (used in JSX) */
+.animate-in { animation-fill-mode: both; }
+.fade-in { animation-name: cebsFadeIn; animation-duration: 0.2s; }
+.zoom-in-95 { animation-name: cebsZoomIn; animation-duration: 0.2s; }
+
+@keyframes cebsZoomIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.slide-in-from-top-2 {
+  animation-name: cebsSlideFromTop;
+  animation-duration: 0.2s;
+}
+
+@keyframes cebsSlideFromTop {
+  from { transform: translateY(-8px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.duration-200 { animation-duration: 0.2s; }
+.duration-300 { animation-duration: 0.3s; }
