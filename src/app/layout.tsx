@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className="h-full">
+    <html lang="pt-BR" className="h-full" suppressHydrationWarning>
       <head>
         {/* Tailwind CSS v3 via CDN — no PostCSS/build-step needed */}
         <script src="https://cdn.tailwindcss.com"></script>
@@ -68,7 +68,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full antialiased font-sans" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <body className="min-h-full antialiased font-sans" style={{ fontFamily: "'Inter', sans-serif" }} suppressHydrationWarning>
         {children}
       </body>
     </html>
