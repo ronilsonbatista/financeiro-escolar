@@ -37,8 +37,8 @@ O **CEBS Financeiro** foi desenvolvido sob medida para o **Centro Educacional Ba
   - Configuração de preferências de runtime, como o controle de bloqueio de edição para competências trancadas.
 - **Gestão de Usuários**:
   - Tabela visual de operadores e níveis de acesso (Administrador, Operador, Visualizador).
-- **Persistência Híbrida / Banco de Dados Real**:
-  - Integração com **Supabase (PostgreSQL)** para persistência oficial em nuvem.
+- **Persistência Híbrida / Banco de Dados Real (Sem Custo)**:
+  - Integração com **Supabase (PostgreSQL - Plano Gratuito)** para persistência oficial na nuvem.
   - Fallback automático para `localStorage` local em modo offline ou em desenvolvimento sem credenciais configuradas.
 - **Interface Premium e Responsiva**:
   - Totalmente responsiva com suporte a menu lateral (sidebar) adaptativo no celular via botão Hambúrguer e backdrop semi-transparente.
@@ -50,40 +50,51 @@ O **CEBS Financeiro** foi desenvolvido sob medida para o **Centro Educacional Ba
 
 - **Core**: [Next.js](https://nextjs.org/) (v16) & [React](https://react.dev/) (v19)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Database**: [Supabase](https://supabase.com/) (PostgreSQL)
+- **Database**: [Supabase](https://supabase.com/) (PostgreSQL - Free Tier)
 - **Styles**: [Tailwind CSS](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Tests**: [Vitest](https://vitest.dev/)
-- **Deployment**: [Vercel](https://vercel.com/)
+- **Deployment**: [Vercel](https://vercel.com/) (Hobby / Free Tier)
 
 ---
 
-## 🗄️ Banco de Dados (Supabase / PostgreSQL)
+## 🗄️ Banco de dados gratuito
 
-O sistema utiliza o **Supabase** (PostgreSQL) como banco de dados principal.
+Este projeto foi projetado para rodar **100% gratuitamente** sem necessidade de contratação de planos pagos ou inclusão de cartão de crédito.
 
-### Arquivos SQL
+O projeto utiliza:
+- **Supabase Free** (Banco de dados PostgreSQL gratuito)
+- **Vercel Free/Hobby** (Hospedagem e deploy gratuito)
 
-Os scripts para criação da estrutura e dados iniciais estão organizados na pasta `supabase/`:
+### Passo a Passo de Configuração
 
-- `supabase/schema.sql`: Criação das tabelas (`users`, `categories`, `cost_centers`, `expenses`, `expense_history`, `school_settings`, `incomes`), índices de performance, restrições e triggers automáticos de `updated_at`.
-- `supabase/seed.sql`: Carga inicial de dados limpos (configurações da escola, usuário admin inicial, 10 categorias padrão, 9 centros de custo e 1 despesa inicial de demonstração).
-- `supabase/policies.sql`: Configuração de segurança Row Level Security (RLS) para proteção das tabelas.
+1. Criar conta no **Supabase** ([supabase.com](https://supabase.com/))
+2. Criar um projeto **gratuito (Free Tier)**
+3. No painel do projeto, abrir a aba **SQL Editor**
+4. Rodar o script `supabase/schema.sql` para criar a estrutura das tabelas
+5. Rodar o script `supabase/seed.sql` para criar a carga inicial limpa de dados
+6. Rodar o script `supabase/policies.sql` para aplicar a segurança RLS
+7. Em **Project Settings -> API**, copiar a **Project URL**
+8. Copiar a **anon / public key**
+9. Criar o arquivo `.env.local` na raiz do projeto baseado no `.env.example`
+10. Rodar `npm run dev` para testar o sistema localmente
+11. Configurar as mesmas variáveis de ambiente na **Vercel** ao publicar o projeto
 
-### Criar banco no Supabase
+---
 
-1. Crie uma conta e um novo projeto em [supabase.com](https://supabase.com/).
-2. No painel do seu projeto Supabase, acesse a aba **SQL Editor**.
-3. Execute o conteúdo de `supabase/schema.sql` para criar a estrutura do banco.
-4. Execute o conteúdo de `supabase/seed.sql` para popular com os dados iniciais.
-5. Execute o conteúdo de `supabase/policies.sql` para aplicar as políticas RLS.
-6. Em **Project Settings -> API**, copie a **Project URL** e a **anon public key**.
+## ⚠️ Avisos de Segurança e Custos
+
+> [!IMPORTANT]
+> - **NÃO** colocar chaves reais no repositório GitHub.
+> - **NÃO** ativar plano pago nem adicionar cartão de crédito no Supabase ou Vercel.
+> - **NÃO** usar recursos pagos desnecessários (Add-ons, funções pagas, custom domains pagos, etc.).
+> - A chave `SUPABASE_SERVICE_ROLE_KEY` jamais deve ser exposta no frontend/browser.
 
 ---
 
 ## 🔑 Variáveis de Ambiente
 
-Crie o arquivo `.env.local` na raiz do projeto baseado no `.env.example`:
+Arquivo `.env.example`:
 
 ```env
 NEXT_PUBLIC_APP_NAME="CEBS Financeiro"
@@ -114,7 +125,7 @@ src/
 ├── types/                # Definições de tipos e interfaces do TypeScript
 supabase/
 ├── schema.sql            # Definição do schema SQL e tabelas PostgreSQL
-├── seed.sql              # Carga inicial limpa de demonstração
+├── seed.sql              # Carga inicial limpa de demonstração (1 despesa)
 └── policies.sql          # Configuração de segurança Row Level Security (RLS)
 public/                   # Imagens e logo da instituição
 ```
@@ -163,9 +174,9 @@ Certifique-se de possuir o [Node.js](https://nodejs.org/) instalado em seu compu
 
 ---
 
-## ☁️ Deploy na Vercel
+## ☁️ Deploy na Vercel (Gratuito - Hobby Tier)
 
-Este projeto está pronto para ser hospedado na **Vercel**:
+Este projeto está pronto para ser hospedado gratuitamente na **Vercel**:
 
 1. Suba o repositório para o seu **GitHub**.
 2. No painel da **Vercel**, clique em **New Project** e importe o repositório.
@@ -175,13 +186,4 @@ Este projeto está pronto para ser hospedado na **Vercel**:
    - `NEXT_PUBLIC_DATA_SOURCE` = `supabase`
    - `NEXT_PUBLIC_SUPABASE_URL` = `https://seu-projeto.supabase.co`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sua-chave-anon-aqui`
-   - `SUPABASE_SERVICE_ROLE_KEY` = `sua-chave-service-role-aqui` *(opcional, usada apenas em chamadas server-side)*
 4. Clique em **Deploy**.
-
----
-
-## 🛡️ Observações de Segurança
-
-- **Chaves Privadas**: A chave `SUPABASE_SERVICE_ROLE_KEY` **nunca** deve ser utilizada no lado do cliente (navegador). Utilize-a apenas em Server Components ou Server Actions.
-- **Arquivos `.env`**: Os arquivos `.env`, `.env.local` e credenciais reais estão devidamente inclusos no `.gitignore` para prevenir vamentos acidentais em repositórios públicos.
-- **Row Level Security (RLS)**: Mantenha as políticas RLS ativas em produção. Em ambientes de produção multi-tenant, configure autenticação real no Supabase (`auth.uid()`).
