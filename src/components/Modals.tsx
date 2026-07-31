@@ -890,7 +890,7 @@ interface CategoryManagerModalProps {
   incomes: Income[];
   onAddCategory: (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdateCategory: (id: string, category: Partial<Category>) => void;
-  onDeleteCategory: (id: string) => boolean;
+  onDeleteCategory: (id: string) => boolean | Promise<boolean>;
 }
 
 export function CategoryManagerModal({

@@ -25,6 +25,10 @@ import {
   ClosedMonthAlert,
   CloseMonthModal
 } from '@/components/Modals';
+import { listExpenses, createExpense, updateExpense, payExpense, cancelExpense, deleteExpense } from '@/services/expensesService';
+import { listIncomes, createIncome, updateIncome, deleteIncome } from '@/services/incomesService';
+import { listCategories, createCategory, updateCategory, deleteCategory } from '@/services/categoriesService';
+import { getSchoolSettings, updateSchoolSettings } from '@/services/settingsService';
 
 // Redesigned: Seed categories limited to exactly 10 default expense categories and 3 default revenue categories
 const seedCategories: Category[] = [
@@ -143,60 +147,50 @@ export default function FinancialDashboard() {
     expense: null,
   });
 
-  // Safe localStorage Hydration on mount using v3 keys to perform clean transition
+  // Safe Hydration on mount using database & service layer with fallback
   useEffect(() => {
-    // 1. Categories
-    const localCategories = localStorage.getItem('school_categories_v3');
-    if (localCategories) {
-      setCategories(JSON.parse(localCategories));
-    } else {
-      setCategories(seedCategories);
-      localStorage.setItem('school_categories_v3', JSON.stringify(seedCategories));
-    }
-
-    // 2. Expenses
-    const localExpenses = localStorage.getItem('school_expenses_v3');
-    if (localExpenses) {
-      setExpenses(JSON.parse(localExpenses));
-    } else {
-      setExpenses(seedExpenses);
-      localStorage.setItem('school_expenses_v3', JSON.stringify(seedExpenses));
-    }
-
-    // 3. Incomes
-    const localIncomes = localStorage.getItem('school_incomes_v3');
-    if (localIncomes) {
-      setIncomes(JSON.parse(localIncomes));
-    } else {
-      setIncomes(seedIncomes);
-      localStorage.setItem('school_incomes_v3', JSON.stringify(seedIncomes));
-    }
-
-    // 4. Closed state
-    const localClosed = localStorage.getItem('school_month_closed_v3');
-    if (localClosed) {
-      setIsMonthClosed(JSON.parse(localClosed));
-    }
-
-    // 5. Settings
-    const localSettings = localStorage.getItem('school_settings_v3');
-    if (localSettings) {
+    const loadInitialData = async () => {
       try {
-        const parsed = JSON.parse(localSettings);
-        if (parsed.schoolName) setSchoolName(parsed.schoolName);
-        if (parsed.schoolNickName) setSchoolNickName(parsed.schoolNickName);
-        if (parsed.schoolDocument) setSchoolDocument(parsed.schoolDocument);
-        if (parsed.schoolPhone) setSchoolPhone(parsed.schoolPhone);
-        if (parsed.schoolEmail) setSchoolEmail(parsed.schoolEmail);
-        if (parsed.schoolCostCenters) setSchoolCostCenters(parsed.schoolCostCenters);
-        if (parsed.schoolPrefAlerts !== undefined) setSchoolPrefAlerts(parsed.schoolPrefAlerts);
-        if (parsed.schoolPrefCloseLock !== undefined) setSchoolPrefCloseLock(parsed.schoolPrefCloseLock);
-      } catch (err) {
-        console.error(err);
-      }
-    }
+        const [fetchedCategories, fetchedExpenses, fetchedIncomes, fetchedSettings] = await Promise.all([
+          listCategories(),
+          listExpenses(),
+          listIncomes(),
+          getSchoolSettings()
+        ]);
 
-    setIsMounted(true);
+        setCategories(fetchedCategories);
+        setExpenses(fetchedExpenses);
+        setIncomes(fetchedIncomes);
+
+        if (fetchedSettings.schoolName) setSchoolName(fetchedSettings.schoolName);
+        if (fetchedSettings.phone) setSchoolPhone(fetchedSettings.phone);
+        if (fetchedSettings.email) setSchoolEmail(fetchedSettings.email);
+        if (fetchedSettings.documentNumber) setSchoolDocument(fetchedSettings.documentNumber);
+
+        const localClosed = localStorage.getItem('school_month_closed_v3');
+        if (localClosed) {
+          setIsMonthClosed(JSON.parse(localClosed));
+        }
+
+        const localSettings = localStorage.getItem('school_settings_v3');
+        if (localSettings) {
+          try {
+            const parsed = JSON.parse(localSettings);
+            if (parsed.schoolCostCenters) setSchoolCostCenters(parsed.schoolCostCenters);
+            if (parsed.schoolPrefAlerts !== undefined) setSchoolPrefAlerts(parsed.schoolPrefAlerts);
+            if (parsed.schoolPrefCloseLock !== undefined) setSchoolPrefCloseLock(parsed.schoolPrefCloseLock);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar dados iniciais:', err);
+      } finally {
+        setIsMounted(true);
+      }
+    };
+
+    loadInitialData();
   }, []);
 
   // Write changes to localStorage when state modifies
@@ -433,7 +427,7 @@ export default function FinancialDashboard() {
   };
 
   // Operations: SAVE (ADD or EDIT)
-  const handleSaveExpense = (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
+  const handleSaveExpense = async (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
     const isEdit = !!data.id;
     
     if (schoolPrefCloseLock && isMonthClosed && data.status === 'pago') {
@@ -442,35 +436,35 @@ export default function FinancialDashboard() {
     }
 
     if (isEdit) {
-      // Edit
       const old = expenses.find(e => e.id === data.id);
       if (schoolPrefCloseLock && isMonthClosed && old && old.status === 'pago') {
         setClosedMonthAlertTriggered(true);
         return;
       }
 
-      setExpenses(prev => prev.map(e => e.id === data.id ? {
-        ...e,
-        ...data,
-        updatedAt: new Date().toISOString(),
-      } as Expense : e));
-
-      addToast('success', 'Despesa Atualizada', `"${data.description}" foi salva com sucesso.`);
+      const res = await updateExpense(data.id!, data);
+      if (res.error) {
+        addToast('error', 'Erro ao Atualizar', res.error);
+        return;
+      }
+      if (res.data) {
+        setExpenses(prev => prev.map(e => e.id === data.id ? res.data! : e));
+        addToast('success', 'Despesa Atualizada', `"${data.description}" foi salva com sucesso.`);
+      }
     } else {
-      // New
-      const newExp: Expense = {
-        ...data,
-        id: `exp-${Date.now()}-${Math.random()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as Expense;
-
-      setExpenses(prev => [newExp, ...prev]);
-      addToast('success', 'Despesa Adicionada', `"${data.description}" foi adicionada no fluxo de caixa.`);
+      const res = await createExpense(data);
+      if (res.error) {
+        addToast('error', 'Erro ao Cadastrar', res.error);
+        return;
+      }
+      if (res.data) {
+        setExpenses(prev => [res.data!, ...prev]);
+        addToast('success', 'Despesa Adicionada', `"${data.description}" foi adicionada no fluxo de caixa.`);
+      }
     }
   };
 
-  const handleSaveIncome = (data: Omit<Income, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
+  const handleSaveIncome = async (data: Omit<Income, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
     const isEdit = !!data.id;
 
     if (schoolPrefCloseLock && isMonthClosed) {
@@ -479,25 +473,25 @@ export default function FinancialDashboard() {
     }
 
     if (isEdit) {
-      // Edit
-      setIncomes(prev => prev.map(i => i.id === data.id ? {
-        ...i,
-        ...data,
-        updatedAt: new Date().toISOString(),
-      } as Income : i));
-
-      addToast('success', 'Receita Atualizada', `"${data.description}" foi salva com sucesso.`);
+      const res = await updateIncome(data.id!, data);
+      if (res.error) {
+        addToast('error', 'Erro ao Atualizar', res.error);
+        return;
+      }
+      if (res.data) {
+        setIncomes(prev => prev.map(i => i.id === data.id ? res.data! : i));
+        addToast('success', 'Receita Atualizada', `"${data.description}" foi salva com sucesso.`);
+      }
     } else {
-      // New
-      const newInc: Income = {
-        ...data,
-        id: `inc-${Date.now()}-${Math.random()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as Income;
-
-      setIncomes(prev => [newInc, ...prev]);
-      addToast('success', 'Receita Adicionada', `"${data.description}" foi adicionada.`);
+      const res = await createIncome(data);
+      if (res.error) {
+        addToast('error', 'Erro ao Cadastrar', res.error);
+        return;
+      }
+      if (res.data) {
+        setIncomes(prev => [res.data!, ...prev]);
+        addToast('success', 'Receita Adicionada', `"${data.description}" foi adicionada.`);
+      }
     }
   };
 
@@ -517,7 +511,12 @@ export default function FinancialDashboard() {
         title: 'Excluir Despesa',
         itemName: target.description,
         warningText: 'Essa ação removerá a despesa do contas a pagar permanentemente.',
-        onConfirm: () => {
+        onConfirm: async () => {
+          const res = await deleteExpense(id);
+          if (res.error) {
+            addToast('error', 'Erro ao Excluir', res.error);
+            return;
+          }
           setExpenses(prev => prev.filter(e => e.id !== id));
           addToast('success', 'Despesa Excluída', `O registro "${target.description}" foi removido.`);
         },
@@ -536,7 +535,12 @@ export default function FinancialDashboard() {
         title: 'Excluir Receita',
         itemName: target.description,
         warningText: 'Essa ação removerá o registro de entrada permanentemente.',
-        onConfirm: () => {
+        onConfirm: async () => {
+          const res = await deleteIncome(id);
+          if (res.error) {
+            addToast('error', 'Erro ao Excluir', res.error);
+            return;
+          }
           setIncomes(prev => prev.filter(i => i.id !== id));
           addToast('success', 'Receita Excluída', `O registro "${target.description}" foi removido.`);
         },
@@ -555,47 +559,33 @@ export default function FinancialDashboard() {
     }
   };
 
-  const handlePayConfirm = (id: string, payDate: string, method: string, notes?: string) => {
-    setExpenses(prev => prev.map(e => {
-      if (e.id === id) {
-        return {
-          ...e,
-          status: 'pago' as TransactionStatus,
-          paymentDate: payDate,
-          paymentMethod: method,
-          notes: notes || e.notes,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return e;
-    }));
-
-    const target = expenses.find(e => e.id === id);
-    addToast(
-      'success',
-      'Liquidação Confirmada',
-      `A despesa "${target?.description || 'Despesa'}" foi baixada com sucesso.`
-    );
+  const handlePayConfirm = async (id: string, payDate: string, method: string, notes?: string) => {
+    const res = await payExpense(id, payDate, method);
+    if (res.error) {
+      addToast('error', 'Erro ao Dar Baixa', res.error);
+      return;
+    }
+    if (res.data) {
+      setExpenses(prev => prev.map(e => e.id === id ? res.data! : e));
+      addToast('success', 'Liquidação Confirmada', `A despesa "${res.data.description}" foi baixada com sucesso.`);
+    }
   };
 
   // Operations: CANCEL EXPENSE
-  const handleCancelExpense = (id: string) => {
+  const handleCancelExpense = async (id: string) => {
     if (schoolPrefCloseLock && isMonthClosed) {
       setClosedMonthAlertTriggered(true);
       return;
     }
-    setExpenses(prev => prev.map(e => {
-      if (e.id === id) {
-        return {
-          ...e,
-          status: 'cancelado' as TransactionStatus,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return e;
-    }));
-    const target = expenses.find(e => e.id === id);
-    addToast('success', 'Despesa Cancelada', `A despesa "${target?.description || 'Despesa'}" foi cancelada.`);
+    const res = await cancelExpense(id);
+    if (res.error) {
+      addToast('error', 'Erro ao Cancelar', res.error);
+      return;
+    }
+    if (res.data) {
+      setExpenses(prev => prev.map(e => e.id === id ? res.data! : e));
+      addToast('success', 'Despesa Cancelada', `A despesa "${res.data.description}" foi cancelada.`);
+    }
   };
 
   // Operations: EDIT Dispatcher
@@ -640,35 +630,53 @@ export default function FinancialDashboard() {
   };
 
   // Operations: CATEGORIES manager
-  const handleAddCategory = (newCat: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const cat: Category = {
-      ...newCat,
-      id: `cat-${Date.now()}-${Math.random()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setCategories(prev => [...prev, cat]);
-    addToast('success', 'Categoria Cadastrada', `A categoria "${cat.name}" foi criada com sucesso.`);
+  const handleAddCategory = async (newCat: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const res = await createCategory(newCat);
+    if (res.error) {
+      addToast('error', 'Erro de Duplicidade', res.error);
+      return;
+    }
+    if (res.data) {
+      setCategories(prev => [...prev, res.data!]);
+      addToast('success', 'Categoria Cadastrada', `A categoria "${res.data.name}" foi criada com sucesso.`);
+    }
   };
 
   // Callback to support inline categories registration from inside transaction creation forms
-  const handleAddCategoryInline = (newCat: Category) => {
-    setCategories(prev => [...prev, newCat]);
-    addToast('success', 'Categoria Criada', `A nova categoria "${newCat.name}" foi cadastrada e selecionada.`);
+  const handleAddCategoryInline = async (newCat: Category) => {
+    const res = await createCategory(newCat);
+    if (res.error) {
+      addToast('error', 'Erro ao criar Categoria', res.error);
+      return;
+    }
+    if (res.data) {
+      setCategories(prev => [...prev, res.data!]);
+      addToast('success', 'Categoria Criada', `A nova categoria "${res.data.name}" foi cadastrada e selecionada.`);
+    }
   };
 
-  const handleUpdateCategory = (id: string, updatedFields: Partial<Category>) => {
-    setCategories(prev => prev.map(c => c.id === id ? {
-      ...c,
-      ...updatedFields,
-      updatedAt: new Date().toISOString(),
-    } as Category : c));
-    addToast('success', 'Categoria Atualizada', 'A categoria foi atualizada no painel escolar.');
+  const handleUpdateCategory = async (id: string, updatedFields: Partial<Category>) => {
+    const res = await updateCategory(id, updatedFields);
+    if (res.error) {
+      addToast('error', 'Erro ao Atualizar', res.error);
+      return;
+    }
+    if (res.data) {
+      setCategories(prev => prev.map(c => c.id === id ? res.data! : c));
+      addToast('success', 'Categoria Atualizada', 'A categoria foi atualizada no painel escolar.');
+    }
   };
 
-  const handleDeleteCategory = (id: string): boolean => {
-    setCategories(prev => prev.filter(c => c.id !== id));
-    addToast('success', 'Categoria Removida', 'A categoria foi removida com sucesso.');
+  const handleDeleteCategory = async (id: string): Promise<boolean> => {
+    const isUsed = expenses.some(e => e.categoryId === id) || incomes.some(i => i.categoryId === id);
+    const res = await deleteCategory(id, isUsed);
+    if (!res.success) {
+      addToast('error', 'Aviso', res.message);
+      return false;
+    }
+    const updatedCats = await listCategories();
+    setCategories(updatedCats);
+    addToast('success', 'Categoria Atualizada', res.message);
     return true;
   };
 
@@ -867,10 +875,10 @@ export default function FinancialDashboard() {
           </div>
 
           {/* Right: actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
 
-            {/* Month status pill */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 11px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, backgroundColor: isMonthClosed ? '#EAF5F0' : '#FFF8EB', color: isMonthClosed ? '#2E7D57' : '#B9891C', border: `1px solid ${isMonthClosed ? 'rgba(46,125,87,0.18)' : 'rgba(185,137,28,0.18)'}` }}>
+            {/* Month status pill — oculta no mobile muito pequeno */}
+            <div className="hidden sm:flex" style={{ alignItems: 'center', gap: '5px', padding: '4px 11px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, backgroundColor: isMonthClosed ? '#EAF5F0' : '#FFF8EB', color: isMonthClosed ? '#2E7D57' : '#B9891C', border: `1px solid ${isMonthClosed ? 'rgba(46,125,87,0.18)' : 'rgba(185,137,28,0.18)'}` }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: isMonthClosed ? '#2E7D57' : '#B9891C', display: 'inline-block', flexShrink: 0 }} />
               {isMonthClosed ? 'Fechado' : 'Aberto'}
             </div>
@@ -878,42 +886,45 @@ export default function FinancialDashboard() {
             {/* Lock/Unlock month */}
             <button
               onClick={isMonthClosed ? handleReopenMonthConfirm : () => setIsCloseMonthModalOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 11px', borderRadius: '7px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', color: '#374151', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}
+              title={isMonthClosed ? 'Reabrir mês' : 'Fechar mês'}
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', color: '#374151', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}
             >
               {isMonthClosed ? <Unlock style={{ width: '13px', height: '13px' }} /> : <Lock style={{ width: '13px', height: '13px' }} />}
-              {isMonthClosed ? 'Reabrir' : 'Fechar mês'}
+              <span className="hidden md:inline">{isMonthClosed ? 'Reabrir' : 'Fechar mês'}</span>
             </button>
 
-            <div style={{ width: '1px', height: '18px', backgroundColor: '#E5E7EB', flexShrink: 0, margin: '0 3px' }} />
+            <div className="hidden sm:block" style={{ width: '1px', height: '18px', backgroundColor: '#E5E7EB', flexShrink: 0, margin: '0 2px' }} />
 
-            {/* Categories */}
-            <button onClick={() => setIsCategoryManagerOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '7px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', color: '#374151', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}>
+            {/* Categories — hidden on small mobile */}
+            <button onClick={() => setIsCategoryManagerOpen(true)} title="Gerenciar Categorias" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', color: '#374151', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}>
               <Tags style={{ width: '13px', height: '13px', color: '#1E3280' }} />
-              Categorias
+              <span className="hidden md:inline">Categorias</span>
             </button>
 
-            {/* Nova Receita */}
+            {/* Nova Receita — hidden on mobile */}
             <button
               onClick={() => { setEditingTransaction(null); setIsIncomeFormOpen(true); }}
               disabled={isMonthClosed}
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '7px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', color: '#374151', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', cursor: isMonthClosed ? 'not-allowed' : 'pointer', opacity: isMonthClosed ? 0.4 : 1, transition: 'all 0.15s' }}
+              title="Nova Receita"
+              className="hidden sm:flex"
+              style={{ alignItems: 'center', gap: '5px', padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #E5E7EB', backgroundColor: '#fff', color: '#374151', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', cursor: isMonthClosed ? 'not-allowed' : 'pointer', opacity: isMonthClosed ? 0.4 : 1, transition: 'all 0.15s' }}
             >
               <PlusCircle style={{ width: '13px', height: '13px', color: '#1E3280' }} />
-              Nova Receita
+              <span className="hidden md:inline">Nova Receita</span>
             </button>
 
             {/* Nova Despesa — primary */}
             <button
               onClick={() => { setEditingTransaction(null); setIsExpenseFormOpen(true); }}
               disabled={isMonthClosed}
-              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 14px', borderRadius: '7px', border: '1.5px solid #1E3280', backgroundColor: '#1E3280', color: '#fff', fontSize: '12px', fontWeight: 700, fontFamily: 'inherit', cursor: isMonthClosed ? 'not-allowed' : 'pointer', opacity: isMonthClosed ? 0.4 : 1, transition: 'all 0.15s', boxShadow: '0 1px 3px rgba(30,50,128,0.25)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 13px', borderRadius: '7px', border: '1.5px solid #1E3280', backgroundColor: '#1E3280', color: '#fff', fontSize: '12px', fontWeight: 700, fontFamily: 'inherit', cursor: isMonthClosed ? 'not-allowed' : 'pointer', opacity: isMonthClosed ? 0.4 : 1, transition: 'all 0.15s', boxShadow: '0 1px 3px rgba(30,50,128,0.25)', whiteSpace: 'nowrap' }}
             >
               <PlusCircle style={{ width: '13px', height: '13px' }} />
-              Nova Despesa
+              <span className="hidden xs:inline">Nova Despesa</span>
             </button>
 
-            {/* Reset ghost */}
-            <button onClick={handleResetToSeeds} title="Limpar dados de demonstração" style={{ padding: '6px 8px', borderRadius: '7px', border: '1.5px solid transparent', backgroundColor: 'transparent', color: '#C4C9D1', fontSize: '11px', fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500 }}>
+            {/* Reset ghost — hidden on mobile */}
+            <button onClick={handleResetToSeeds} title="Limpar dados de demonstração" className="hidden md:block" style={{ padding: '6px 8px', borderRadius: '7px', border: '1.5px solid transparent', backgroundColor: 'transparent', color: '#C4C9D1', fontSize: '11px', fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500 }}>
               Limpar
             </button>
           </div>
@@ -921,9 +932,9 @@ export default function FinancialDashboard() {
 
         {/* ── SUB-TABS ── */}
         {activeTab !== 'users' && activeTab !== 'settings' && (
-          <div style={{ backgroundColor: '#fff', borderBottom: '1px solid #E8E9EC', display: 'flex', alignItems: 'center' }} className="px-4 md:px-8">
+          <div style={{ backgroundColor: '#fff', borderBottom: '1px solid #E8E9EC', display: 'flex', alignItems: 'center', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }} className="px-4 md:px-8">
             {([
-              { id: 'overview',   label: 'Dashboard de Gastos' },
+              { id: 'overview',   label: 'Dashboard' },
               { id: 'expenses',   label: 'Despesas' },
               { id: 'categories', label: 'Categorias' },
               { id: 'reports',    label: 'Relatórios' },
@@ -932,18 +943,18 @@ export default function FinancialDashboard() {
                 key={id}
                 onClick={() => setActiveTab(id)}
                 style={{
-                  padding: '13px 20px', fontSize: '13px', fontFamily: 'inherit',
+                  padding: '13px 16px', fontSize: '13px', fontFamily: 'inherit',
                   fontWeight: activeTab === id ? 600 : 500,
                   color: activeTab === id ? '#1E3280' : '#6B7280',
                   borderBottom: `2px solid ${activeTab === id ? '#1E3280' : 'transparent'}`,
                   border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
-                  transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
                 }}
               >{label}</button>
             ))}
 
-            {/* Right side: Contas a Pagar pill + date range */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Right side: Contas a Pagar pill + date range (hidden on small mobile) */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <DateRangeFilter
                 selectedRange={dateRangeOption}
                 onChangeRange={setDateRangeOption}
@@ -953,10 +964,10 @@ export default function FinancialDashboard() {
               />
               <button
                 onClick={() => { setLedgerMode('despesa'); setQuickFilter(quickFilter === 'payables' ? 'all' : 'payables'); if (quickFilter !== 'payables') setActiveTab('expenses'); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 13px', borderRadius: '99px', border: `1.5px solid ${quickFilter === 'payables' ? '#1E3280' : '#E5E7EB'}`, backgroundColor: quickFilter === 'payables' ? 'rgba(30,50,128,0.07)' : '#fff', color: quickFilter === 'payables' ? '#1E3280' : '#6B7280', fontSize: '11.5px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '99px', border: `1.5px solid ${quickFilter === 'payables' ? '#1E3280' : '#E5E7EB'}`, backgroundColor: quickFilter === 'payables' ? 'rgba(30,50,128,0.07)' : '#fff', color: quickFilter === 'payables' ? '#1E3280' : '#6B7280', fontSize: '11px', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}
               >
                 <CreditCard style={{ width: '12px', height: '12px' }} />
-                Contas a Pagar
+                <span className="hidden sm:inline">Contas a Pagar</span>
                 {payablesStats.countPending + payablesStats.countOverdue > 0 && (
                   <span style={{ padding: '0 5px', borderRadius: '99px', backgroundColor: '#1E3280', color: '#fff', fontSize: '9.5px', fontWeight: 700, lineHeight: '16px' }}>
                     {payablesStats.countPending + payablesStats.countOverdue}
@@ -1005,7 +1016,7 @@ export default function FinancialDashboard() {
               )}
 
               {/* ── 5 Metric Cards ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
                 {/* Total Despesas */}
                 <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1079,7 +1090,7 @@ export default function FinancialDashboard() {
 
               {/* Revenue cards (conditional) */}
               {showRevenueSummary && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', animation: 'cebsFadeIn 0.2s ease forwards' }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4" style={{ animation: 'cebsFadeIn 0.2s ease forwards' }}>
                   <div className="cebs-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Receita Bruta do Mês</span>
                     <CurrencyValue value={cardsData.grossRevenue} colorType="positive" size="2xl" />
@@ -1094,7 +1105,7 @@ export default function FinancialDashboard() {
               )}
 
               {/* ── CHARTS SECTION (2 columns) ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+              <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-5">
 
                 {/* Evolution & Status distribution */}
                 <div className="cebs-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '22px' }}>

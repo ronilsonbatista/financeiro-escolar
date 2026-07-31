@@ -3,6 +3,7 @@ export type TransactionStatus = 'pago' | 'pendente' | 'atrasado' | 'cancelado';
 export interface Category {
   id: string;
   name: string;
+  description?: string;
   type: 'receita' | 'despesa';
   color: string; // Tailwind color name (e.g. 'indigo', 'amber')
   icon: string; // Lucide icon component name

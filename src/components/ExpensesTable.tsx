@@ -365,31 +365,16 @@ export default function ExpensesTable({
             const Icon = cat.Icon;
 
             return (
-              <div key={exp.id} className="p-5 rounded-lg border border-slate-200 bg-white space-y-4 shadow-xs text-slate-900">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="p-1.5 rounded-md border border-slate-100"
-                      style={{
-                        color: cat.iconColor,
-                        backgroundColor: cat.iconBg
-                      }}
-                    >
-                      <Icon className="w-4 h-4 font-bold" />
-                    </div>
-                    <span className="font-extrabold text-xs text-slate-900">{cat.name}</span>
-                  </div>
-                  <StatusBadge status={exp.status} />
-                </div>
-
-                <div className="flex justify-between items-start gap-2">
-                  <div className="space-y-1 truncate text-left">
-                    <h5 className="font-extrabold text-slate-900 text-base truncate">{exp.description}</h5>
+              <div key={exp.id} className="p-5 rounded-xl border border-slate-200 bg-white space-y-4 shadow-sm text-slate-900 transition-all hover:border-slate-350">
+                {/* TOPO: Descrição + Status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1 text-left">
+                    <h5 className="font-extrabold text-slate-900 text-sm xs:text-base leading-tight break-words">{exp.description}</h5>
                     <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 font-semibold leading-none">
-                      <span>{exp.supplier}</span>
+                      {exp.supplier && <span>{exp.supplier}</span>}
                       {exp.costCenter && (
                         <>
-                          <span>&bull;</span>
+                          {exp.supplier && <span>&bull;</span>}
                           <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/40 text-slate-650 font-bold uppercase tracking-wider text-[8px]">
                             {exp.costCenter}
                           </span>
@@ -397,47 +382,90 @@ export default function ExpensesTable({
                       )}
                     </div>
                   </div>
-                  <CurrencyValue value={-exp.amount} colorType="negative" size="lg" />
+                  <div className="shrink-0">
+                    <StatusBadge status={exp.status} />
+                  </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs text-left">
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Vencimento</span>
+                {/* MEIO: Categoria, Vencimento, Pagamento */}
+                <div className="pt-3 border-t border-slate-100 space-y-2 text-xs text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-bold">Categoria:</span>
+                    <div className="flex items-center gap-1.5">
+                      <div 
+                        className="p-1 rounded flex items-center justify-center"
+                        style={{ color: cat.iconColor, backgroundColor: cat.iconBg }}
+                      >
+                        <Icon className="w-3.5 h-3.5 font-bold" />
+                      </div>
+                      <span className="font-bold text-slate-900">{cat.name}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-bold">Vencimento:</span>
                     <span className="font-bold text-slate-900">{formatDate(exp.dueDate)}</span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Pagamento</span>
-                    <span className="font-bold text-slate-900">{formatDate(exp.paymentDate)}</span>
-                  </div>
+
+                  {exp.status === 'pago' && (
+                    <>
+                      {exp.paymentDate && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-bold">Pago Em:</span>
+                          <span className="font-bold text-status-success-text">{formatDate(exp.paymentDate)}</span>
+                        </div>
+                      )}
+                      {exp.paymentMethod && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-bold">Forma:</span>
+                          <span className="font-bold text-slate-900 capitalize">{exp.paymentMethod}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                {/* DESTAQUE: Valor */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs text-slate-500 font-bold">Valor da Despesa:</span>
+                  <CurrencyValue value={-exp.amount} colorType="negative" size="md" />
+                </div>
+
+                {/* RODAPÉ: Ações */}
+                <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-slate-100">
                   {(exp.status === 'pendente' || exp.status === 'atrasado') && (
                     <button
                       onClick={() => onPay(exp.id)}
-                      className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg border border-status-success-border bg-status-success-bg text-status-success-text hover:bg-status-success-text hover:text-white transition-all cursor-pointer shadow-xs"
+                      className="w-full h-11 flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg border border-status-success-border bg-status-success-bg text-status-success-text hover:bg-status-success-text hover:text-white transition-all cursor-pointer shadow-2xs"
+                      style={{ height: '40px' }}
                     >
                       <Check className="w-4 h-4" />
                       <span>Dar Baixa</span>
                     </button>
                   )}
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full justify-end">
                     <button
                       onClick={() => onViewDetails(exp.id, 'despesa')}
-                      className="p-2.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
+                      className="flex-1 sm:flex-none h-10 px-3 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                      title="Visualizar"
+                      style={{ height: '40px' }}
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onEdit(exp.id, 'despesa')}
-                      className="p-2.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
+                      className="flex-1 sm:flex-none h-10 px-3 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                      title="Editar"
+                      style={{ height: '40px' }}
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onDelete(exp.id, 'despesa')}
-                      className="p-2.5 rounded-lg border border-red-200/60 bg-white text-red-650 hover:bg-red-50 transition-all cursor-pointer shadow-xs"
+                      className="flex-1 sm:flex-none h-10 px-3 rounded-lg border border-red-200/60 bg-white text-red-650 hover:bg-red-50 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                      title="Excluir"
+                      style={{ height: '40px' }}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -453,56 +481,82 @@ export default function ExpensesTable({
             const Icon = cat.Icon;
 
             return (
-              <div key={inc.id} className="p-5 rounded-lg border border-slate-200 bg-white space-y-4 shadow-xs text-slate-900">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="p-1.5 rounded-md border border-slate-100"
-                      style={{
-                        color: cat.iconColor,
-                        backgroundColor: cat.iconBg
-                      }}
-                    >
-                      <Icon className="w-4 h-4 font-bold" />
+              <div key={inc.id} className="p-5 rounded-xl border border-slate-200 bg-white space-y-4 shadow-sm text-slate-900 transition-all hover:border-slate-350">
+                {/* TOPO: Descrição + Status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1 text-left">
+                    <h5 className="font-extrabold text-slate-900 text-sm xs:text-base leading-tight break-words">{inc.description}</h5>
+                    {inc.source && (
+                      <p className="text-xs text-slate-500 font-semibold leading-none">
+                        Origem: {inc.source}
+                      </p>
+                    )}
+                  </div>
+                  <div className="shrink-0">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-black rounded-full border border-status-success-border bg-status-success-bg text-status-success-text">
+                      <span className="w-1.5 h-1.5 rounded-full bg-status-success-text" />
+                      <span>Recebido</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* MEIO: Categoria, Data de Recebimento, Pagamento */}
+                <div className="pt-3 border-t border-slate-100 space-y-2 text-xs text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-bold">Categoria:</span>
+                    <div className="flex items-center gap-1.5">
+                      <div 
+                        className="p-1 rounded flex items-center justify-center"
+                        style={{ color: cat.iconColor, backgroundColor: cat.iconBg }}
+                      >
+                        <Icon className="w-3.5 h-3.5 font-bold" />
+                      </div>
+                      <span className="font-bold text-slate-900">{cat.name}</span>
                     </div>
-                    <span className="font-extrabold text-xs text-slate-900">{cat.name}</span>
                   </div>
-                  <span className="inline-flex items-center gap-2 px-3 py-1 text-[11px] font-extrabold rounded-full border border-status-success-border bg-status-success-bg text-status-success-text">
-                    <span className="w-1.5 h-1.5 rounded-full bg-status-success-text" />
-                    <span>Recebido</span>
-                  </span>
-                </div>
 
-                <div className="flex justify-between items-start gap-2">
-                  <div className="space-y-1 truncate text-left">
-                    <h5 className="font-extrabold text-slate-900 text-base truncate">{inc.description}</h5>
-                    <p className="text-xs text-slate-500 truncate">{inc.source}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-bold">Recebido Em:</span>
+                    <span className="font-bold text-slate-900">{formatDate(inc.receivedDate)}</span>
                   </div>
-                  <CurrencyValue value={inc.amount} colorType="positive" size="lg" />
+
+                  {inc.paymentMethod && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 font-bold">Forma:</span>
+                      <span className="font-bold text-slate-900 capitalize">{inc.paymentMethod}</span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 text-xs text-left">
-                  <span className="text-slate-500 block text-[10px] uppercase font-bold">Data de Recebimento</span>
-                  <span className="font-bold text-slate-900">{formatDate(inc.receivedDate)}</span>
+                {/* DESTAQUE: Valor */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs text-slate-500 font-bold">Valor da Receita:</span>
+                  <CurrencyValue value={inc.amount} colorType="positive" size="md" />
                 </div>
 
-                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                {/* RODAPÉ: Ações */}
+                <div className="flex items-center gap-2 pt-3 border-t border-slate-100 justify-end">
                   <button
                     onClick={() => onViewDetails(inc.id, 'receita')}
-                    className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all cursor-pointer shadow-xs"
+                    className="flex-1 sm:flex-none h-10 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1 text-xs font-bold"
+                    style={{ height: '40px' }}
                   >
                     <Eye className="w-4 h-4" />
-                    <span>Ver Detalhes</span>
+                    <span className="hidden xs:inline">Visualizar</span>
                   </button>
                   <button
                     onClick={() => onEdit(inc.id, 'receita')}
-                    className="p-2.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
+                    className="p-2.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                    title="Editar"
+                    style={{ height: '40px', width: '40px' }}
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => onDelete(inc.id, 'receita')}
-                    className="p-2.5 rounded-lg border border-red-200/60 bg-white text-red-650 hover:bg-red-50 transition-all cursor-pointer shadow-xs"
+                    className="p-2.5 rounded-lg border border-red-200/60 bg-white text-red-650 hover:bg-red-50 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                    title="Excluir"
+                    style={{ height: '40px', width: '40px' }}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
