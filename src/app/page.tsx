@@ -2,13 +2,13 @@
 /* eslint-disable @next/next/no-img-element */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Expense, Income, Category, TransactionStatus } from '@/types/financial';
+import { Expense, Income, Category, Supplier, TransactionStatus } from '@/types/financial';
 import {
   TrendingUp, TrendingDown, Clock, AlertTriangle, Scale, PieChart,
   PlusCircle, FilterX, HelpCircle, ArrowRightLeft, FolderOpen,
   DollarSign, FileSpreadsheet, ListFilter, CheckSquare, Sparkles,
   Lock, Unlock, ChevronRight, Tags, AlertCircle, Trash2, CheckCircle2,
-  LayoutDashboard, Receipt, Settings, Users, CreditCard, BarChart3, Menu
+  LayoutDashboard, Receipt, Settings, Users, CreditCard, BarChart3, Menu, Truck
 } from 'lucide-react';
 import DateRangeFilter, { DateRangeOption } from '@/components/DateRangeFilter';
 import CategoryCardsGrid from '@/components/CategoryCardsGrid';
@@ -21,6 +21,7 @@ import {
   ExpenseFormModal,
   IncomeFormModal,
   CategoryManagerModal,
+  SupplierManagerModal,
   DetailsModal,
   ClosedMonthAlert,
   CloseMonthModal
@@ -29,6 +30,7 @@ import { listExpenses, createExpense, updateExpense, payExpense, cancelExpense, 
 import { listIncomes, createIncome, updateIncome, deleteIncome } from '@/services/incomesService';
 import { listCategories, createCategory, updateCategory, deleteCategory } from '@/services/categoriesService';
 import { getSchoolSettings, updateSchoolSettings } from '@/services/settingsService';
+import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from '@/services/suppliersService';
 
 // Redesigned: Seed categories limited to exactly 10 default expense categories and 3 default revenue categories
 const seedCategories: Category[] = [
@@ -80,6 +82,7 @@ export default function FinancialDashboard() {
 
   // States
   const [categories, setCategories] = useState<Category[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [isMonthClosed, setIsMonthClosed] = useState(false);
@@ -89,7 +92,7 @@ export default function FinancialDashboard() {
   const [quickFilter, setQuickFilter] = useState<'all' | 'payables'>('all');
   const [ledgerMode, setLedgerMode] = useState<'despesa' | 'receita'>('despesa');
   const [showRevenueSummary, setShowRevenueSummary] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'categories' | 'reports' | 'users' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'categories' | 'suppliers' | 'reports' | 'users' | 'settings'>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('current');
   const [customStartDate, setCustomStartDate] = useState('2026-07-01');
@@ -108,6 +111,7 @@ export default function FinancialDashboard() {
   // Advanced Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TransactionStatus>('all');
+  const [supplierFilter, setSupplierFilter] = useState('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
   const [costCenterFilter, setCostCenterFilter] = useState('');
   const [minAmountFilter, setMinAmountFilter] = useState('');
@@ -121,6 +125,7 @@ export default function FinancialDashboard() {
   const [selectedDetailTransaction, setSelectedDetailTransaction] = useState<any | null>(null);
   
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [isSupplierManagerOpen, setIsSupplierManagerOpen] = useState(false);
   const [isCloseMonthModalOpen, setIsCloseMonthModalOpen] = useState(false);
   
   const [closedMonthAlertTriggered, setClosedMonthAlertTriggered] = useState(false);
@@ -151,14 +156,16 @@ export default function FinancialDashboard() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [fetchedCategories, fetchedExpenses, fetchedIncomes, fetchedSettings] = await Promise.all([
+        const [fetchedCategories, fetchedSuppliers, fetchedExpenses, fetchedIncomes, fetchedSettings] = await Promise.all([
           listCategories(),
+          listSuppliers(),
           listExpenses(),
           listIncomes(),
           getSchoolSettings()
         ]);
 
         setCategories(fetchedCategories);
+        setSuppliers(fetchedSuppliers);
         setExpenses(fetchedExpenses);
         setIncomes(fetchedIncomes);
 
@@ -369,6 +376,13 @@ export default function FinancialDashboard() {
       }
       // Status filter
       if (statusFilter !== 'all' && e.status !== statusFilter) return false;
+      // Supplier filter
+      if (supplierFilter !== 'all') {
+        const targetSup = suppliers.find(s => s.id === supplierFilter);
+        const nameMatch = targetSup && e.supplier?.toLowerCase() === targetSup.name.toLowerCase();
+        const idMatch = e.supplierId === supplierFilter;
+        if (!nameMatch && !idMatch) return false;
+      }
       // Payment method
       if (paymentMethodFilter !== 'all' && e.paymentMethod !== paymentMethodFilter) return false;
       // Cost center
@@ -380,7 +394,7 @@ export default function FinancialDashboard() {
 
       return true;
     });
-  }, [processedExpenses, selectedCategoryName, quickFilter, searchQuery, statusFilter, paymentMethodFilter, costCenterFilter, minAmountFilter, maxAmountFilter, categories, dateBounds]);
+  }, [processedExpenses, selectedCategoryName, quickFilter, searchQuery, statusFilter, supplierFilter, suppliers, paymentMethodFilter, costCenterFilter, minAmountFilter, maxAmountFilter, categories, dateBounds]);
 
   const filteredIncomes = useMemo(() => {
     return incomes.filter(i => {
@@ -419,6 +433,7 @@ export default function FinancialDashboard() {
     setQuickFilter('all');
     setSearchQuery('');
     setStatusFilter('all');
+    setSupplierFilter('all');
     setPaymentMethodFilter('all');
     setCostCenterFilter('');
     setMinAmountFilter('');
@@ -680,6 +695,57 @@ export default function FinancialDashboard() {
     return true;
   };
 
+  // Operations: SUPPLIERS manager
+  const handleAddSupplier = async (newSup: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const res = await createSupplier(newSup);
+    if (res.error) {
+      addToast('error', 'Erro de Duplicidade', res.error);
+      return;
+    }
+    if (res.data) {
+      setSuppliers(prev => [...prev, res.data!]);
+      addToast('success', 'Fornecedor Cadastrado', `O fornecedor "${res.data.name}" foi cadastrado com sucesso.`);
+    }
+  };
+
+  const handleAddSupplierInline = async (newSup: Supplier) => {
+    const res = await createSupplier(newSup);
+    if (res.error) {
+      addToast('error', 'Erro ao criar Fornecedor', res.error);
+      return;
+    }
+    if (res.data) {
+      setSuppliers(prev => [...prev, res.data!]);
+      addToast('success', 'Fornecedor Criado', `O novo fornecedor "${res.data.name}" foi cadastrado e selecionado.`);
+    }
+  };
+
+  const handleUpdateSupplier = async (id: string, updatedFields: Partial<Supplier>) => {
+    const res = await updateSupplier(id, updatedFields);
+    if (res.error) {
+      addToast('error', 'Erro ao Atualizar', res.error);
+      return;
+    }
+    if (res.data) {
+      setSuppliers(prev => prev.map(s => s.id === id ? res.data! : s));
+      addToast('success', 'Fornecedor Atualizado', 'O fornecedor foi atualizado com sucesso.');
+    }
+  };
+
+  const handleDeleteSupplier = async (id: string): Promise<boolean> => {
+    const targetSup = suppliers.find(s => s.id === id);
+    const isUsed = expenses.some(e => e.supplierId === id || (targetSup && e.supplier.toLowerCase() === targetSup.name.toLowerCase()));
+    const res = await deleteSupplier(id, isUsed);
+    if (!res.success) {
+      addToast('error', 'Aviso', res.message);
+      return false;
+    }
+    const updatedSups = await listSuppliers();
+    setSuppliers(updatedSups);
+    addToast('success', 'Fornecedores Atualizados', res.message);
+    return true;
+  };
+
   // Operations: CLOSE / REOPEN MONTH
   const handleCloseMonthConfirm = () => {
     setIsMonthClosed(true);
@@ -744,7 +810,7 @@ export default function FinancialDashboard() {
   };
 
   // Helper: get display title for current tab
-  const tabTitle = activeTab === 'overview' ? 'Dashboard de Gastos' : activeTab === 'expenses' ? 'Despesas' : activeTab === 'categories' ? 'Categorias' : activeTab === 'reports' ? 'Relatórios' : activeTab === 'users' ? 'Usuários' : 'Configurações';
+  const tabTitle = activeTab === 'overview' ? 'Dashboard de Gastos' : activeTab === 'expenses' ? 'Despesas' : activeTab === 'categories' ? 'Categorias' : activeTab === 'suppliers' ? 'Fornecedores' : activeTab === 'reports' ? 'Relatórios' : activeTab === 'users' ? 'Usuários' : 'Configurações';
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: "'Inter', -apple-system, sans-serif", backgroundColor: '#F4F5F7' }}>
@@ -790,6 +856,7 @@ export default function FinancialDashboard() {
             { id: 'overview',    label: 'Dashboard de Gastos',  Icon: LayoutDashboard },
             { id: 'expenses',    label: 'Despesas',   Icon: Receipt },
             { id: 'categories',  label: 'Categorias', Icon: Tags },
+            { id: 'suppliers',   label: 'Fornecedores', Icon: Truck },
             { id: 'reports',     label: 'Relatórios', Icon: BarChart3 },
           ] as const).map(({ id, label, Icon }) => (
             <button
@@ -1492,7 +1559,7 @@ export default function FinancialDashboard() {
 
               {/* Advanced filters panel */}
               {showAdvancedFilters && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', padding: '16px 18px', backgroundColor: '#fff', borderRadius: '10px', border: '1.5px solid #E5E7EB' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', padding: '16px 18px', backgroundColor: '#fff', borderRadius: '10px', border: '1.5px solid #E5E7EB' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     <span style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Status</span>
                     <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="walltravel-input" style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'inherit' }}>
@@ -1501,6 +1568,15 @@ export default function FinancialDashboard() {
                       <option value="atrasado">Vencida</option>
                       <option value="pago">Paga</option>
                       <option value="cancelado">Cancelada</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Fornecedor</span>
+                    <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="walltravel-input" style={{ padding: '7px 10px', fontSize: '12px', fontFamily: 'inherit' }}>
+                      <option value="all">Todos os Fornecedores</option>
+                      {suppliers.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -1564,6 +1640,76 @@ export default function FinancialDashboard() {
             </div>
           )}
 
+          {/* ─── TAB: FORNECEDORES ─── */}
+          {activeTab === 'suppliers' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#111827' }}>Cadastro e Gestão de Fornecedores</h3>
+                  <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>
+                    Gerencie fornecedores, CNPJ/CPF, contatos e acompanhe despesas vinculadas.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsSupplierManagerOpen(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 16px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #1E3280',
+                    backgroundColor: '#1E3280',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <PlusCircle style={{ width: '15px', height: '15px' }} />
+                  Gerenciar Fornecedores
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-sans">
+                {suppliers.map(sup => {
+                  const linkedExpenses = expenses.filter(e => e.supplierId === sup.id || e.supplier.toLowerCase() === sup.name.toLowerCase());
+                  const totalSpent = linkedExpenses.filter(e => e.status !== 'cancelado').reduce((sum, e) => sum + e.amount, 0);
+
+                  return (
+                    <div key={sup.id} className="p-5 rounded-xl border border-slate-200 bg-white space-y-3 shadow-xs text-left">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-extrabold text-slate-900 text-sm md:text-base">{sup.name}</h4>
+                          <span className="text-xs text-slate-500 font-medium">
+                            {sup.documentNumber ? `CNPJ/CPF: ${sup.documentNumber}` : 'Sem documento registrado'}
+                          </span>
+                        </div>
+                        {!sup.isActive && (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-slate-100 text-slate-500">Inativo</span>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs text-slate-600 font-semibold">
+                        {sup.phone && <div>📞 {sup.phone}</div>}
+                        {sup.email && <div>✉️ {sup.email}</div>}
+                        <div className="text-slate-900 font-bold pt-1">
+                          Despesas vinculadas: {linkedExpenses.length} ({totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {suppliers.length === 0 && (
+                  <div className="col-span-full py-12 text-center text-slate-400 text-xs font-semibold">
+                    Nenhum fornecedor cadastrado até o momento.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ─── TAB: RELATÓRIOS ─── */}
           {activeTab === 'reports' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px' }}>
@@ -1581,7 +1727,7 @@ export default function FinancialDashboard() {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                 {/* Despesas summary */}
                 <div className="walltravel-panel" style={{ padding: '22px 24px' }}>
                   <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: '14px' }}>Resumo de Despesas</p>
@@ -1620,6 +1766,26 @@ export default function FinancialDashboard() {
                   </div>
                 </div>
 
+                {/* Por fornecedor */}
+                <div className="walltravel-panel" style={{ padding: '22px 24px' }}>
+                  <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: '14px' }}>Por Fornecedor</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {suppliers.map(sup => {
+                      const supTotal = processedExpenses.filter(e => (e.supplierId === sup.id || e.supplier.toLowerCase() === sup.name.toLowerCase()) && e.status !== 'cancelado').reduce((s, e) => s + e.amount, 0);
+                      if (supTotal === 0) return null;
+                      return (
+                        <div key={sup.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '13px', color: '#6B7280' }}>{sup.name}</span>
+                          <CurrencyValue value={-supTotal} colorType="neutral" size="sm" />
+                        </div>
+                      );
+                    })}
+                    {suppliers.every(s => processedExpenses.filter(e => (e.supplierId === s.id || e.supplier.toLowerCase() === s.name.toLowerCase()) && e.status !== 'cancelado').reduce((sum, e) => sum + e.amount, 0) === 0) && (
+                      <p style={{ fontSize: '12px', color: '#D1D5DB', textAlign: 'center', padding: '8px 0' }}>Nenhum fornecedor vinculado</p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Receitas */}
                 <div className="walltravel-panel" style={{ padding: '22px 24px' }}>
                   <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: '14px' }}>Receitas e Resultado</p>
@@ -1652,9 +1818,10 @@ export default function FinancialDashboard() {
       </div>
 
       {/* ═══════════════ MODALS ═══════════════ */}
-      <ExpenseFormModal isOpen={isExpenseFormOpen} onClose={() => setIsExpenseFormOpen(false)} onSubmit={handleSaveExpense} categories={categories} editingExpense={editingTransaction} onAddCategoryInline={handleAddCategoryInline} />
+      <ExpenseFormModal isOpen={isExpenseFormOpen} onClose={() => setIsExpenseFormOpen(false)} onSubmit={handleSaveExpense} categories={categories} suppliers={suppliers} editingExpense={editingTransaction} onAddCategoryInline={handleAddCategoryInline} onAddSupplierInline={handleAddSupplierInline} />
       <IncomeFormModal isOpen={isIncomeFormOpen} onClose={() => setIsIncomeFormOpen(false)} onSubmit={handleSaveIncome} categories={categories} editingIncome={editingTransaction} onAddCategoryInline={handleAddCategoryInline} />
       <CategoryManagerModal isOpen={isCategoryManagerOpen} onClose={() => setIsCategoryManagerOpen(false)} categories={categories} expenses={expenses} incomes={incomes} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />
+      <SupplierManagerModal isOpen={isSupplierManagerOpen} onClose={() => setIsSupplierManagerOpen(false)} suppliers={suppliers} expenses={expenses} onAddSupplier={handleAddSupplier} onUpdateSupplier={handleUpdateSupplier} onDeleteSupplier={handleDeleteSupplier} />
       <DetailsModal isOpen={!!selectedDetailTransaction} onClose={() => setSelectedDetailTransaction(null)} transaction={selectedDetailTransaction} categories={categories} onPay={handlePayTrigger} onDelete={(id) => handleDeleteTrigger(id, selectedDetailTransaction?.type === 'receita' ? 'receita' : 'despesa')} onCancel={handleCancelExpense} />
       <CloseMonthModal isOpen={isCloseMonthModalOpen} onClose={() => setIsCloseMonthModalOpen(false)} expenses={expenses} incomes={incomes} onConfirm={handleCloseMonthConfirm} />
       <ClosedMonthAlert isOpen={closedMonthAlertTriggered} onClose={() => setClosedMonthAlertTriggered(false)} onReopen={handleReopenMonthConfirm} />

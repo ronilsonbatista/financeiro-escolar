@@ -82,13 +82,41 @@ CREATE TRIGGER trg_cost_centers_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- -------------------------------------------------------
--- 4. Tabela: expenses (Lançamentos de Despesas)
+-- 4. Tabela: suppliers (Fornecedores Cadastrados)
+-- -------------------------------------------------------
+CREATE TABLE IF NOT EXISTS suppliers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    document_number TEXT,
+    phone TEXT,
+    email TEXT,
+    notes TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE suppliers IS 'Cadastro unificado de fornecedores e prestadores de serviço';
+
+CREATE TRIGGER trg_suppliers_updated_at
+    BEFORE UPDATE ON suppliers
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Índice único parcial para evitar fornecedores ativos duplicados (case-insensitive)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_suppliers_unique_active_name
+ON suppliers (LOWER(name))
+WHERE is_active = TRUE;
+
+-- -------------------------------------------------------
+-- 5. Tabela: expenses (Lançamentos de Despesas)
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     description TEXT NOT NULL,
     category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
     cost_center_id UUID REFERENCES cost_centers(id) ON DELETE SET NULL,
+    supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
     supplier TEXT,
     amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
     due_date DATE NOT NULL,
@@ -115,13 +143,14 @@ CREATE TRIGGER trg_expenses_updated_at
 
 -- Índices de alta performance para despesas
 CREATE INDEX IF NOT EXISTS idx_expenses_category_id ON expenses(category_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_supplier_id ON expenses(supplier_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_cost_center_id ON expenses(cost_center_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_due_date ON expenses(due_date);
 CREATE INDEX IF NOT EXISTS idx_expenses_deleted_at ON expenses(deleted_at);
 
 -- -------------------------------------------------------
--- 5. Tabela: expense_history (Auditoria e Histórico de Alterações)
+-- 6. Tabela: expense_history (Auditoria e Histórico de Alterações)
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS expense_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -138,7 +167,7 @@ COMMENT ON TABLE expense_history IS 'Log de auditoria para rastreabilidade de al
 CREATE INDEX IF NOT EXISTS idx_expense_history_expense_id ON expense_history(expense_id);
 
 -- -------------------------------------------------------
--- 6. Tabela: school_settings (Configurações Gerais da Escola)
+-- 7. Tabela: school_settings (Configurações Gerais da Escola)
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS school_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -161,7 +190,7 @@ CREATE TRIGGER trg_school_settings_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- -------------------------------------------------------
--- 7. Tabela: incomes (Receitas Escolares - Módulo Auxiliar)
+-- 8. Tabela: incomes (Receitas Escolares - Módulo Auxiliar)
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS incomes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -12,11 +12,24 @@ export interface Category {
   updatedAt: string;
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  documentNumber?: string; // CNPJ / CPF
+  phone?: string;
+  email?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Expense {
   id: string;
   description: string;
   categoryId: string; // foreign key to Category
-  supplier: string;
+  supplierId?: string; // foreign key to Supplier
+  supplier: string; // text representation (for backwards compatibility)
   amount: number;
   dueDate: string; // YYYY-MM-DD
   paymentDate?: string; // YYYY-MM-DD

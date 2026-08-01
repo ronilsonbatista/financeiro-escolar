@@ -65,12 +65,21 @@ INSERT INTO cost_centers (id, name, description, is_active) VALUES
 ('33333333-3333-3333-3333-333333333309', 'Eventos', 'Datas comemorativas, formaturas e projetos', true)
 ON CONFLICT (id) DO NOTHING;
 
--- 5. Inserir 1 Despesa Fake Única de Demonstração
+-- 5. Inserir Fornecedores Iniciais Básicos
+INSERT INTO suppliers (id, name, document_number, phone, email, notes, is_active) VALUES
+('55555555-5555-5555-5555-555555555501', 'Neoenergia Coelba', '15.135.617/0001-43', '0800 071 0800', 'atendimento@coelba.com.br', 'Concessionária de energia elétrica', true),
+('55555555-5555-5555-5555-555555555502', 'Papelaria & Cia', '22.333.444/0001-55', '(73) 3531-2020', 'vendas@papelariaecia.com.br', 'Fornecedor de material escolar e escritório', true),
+('55555555-5555-5555-5555-555555555503', 'ServTec Manutenção', '33.444.555/0001-66', '(73) 99988-7766', 'contato@servtec.com.br', 'Prestador de manutenção predial e elétrica', true),
+('55555555-5555-5555-5555-555555555504', 'Outros', NULL, NULL, NULL, 'Fornecedores diversos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 6. Inserir 1 Despesa Fake Única de Demonstração
 INSERT INTO expenses (
     id,
     description,
     category_id,
     cost_center_id,
+    supplier_id,
     supplier,
     amount,
     due_date,
@@ -83,6 +92,7 @@ INSERT INTO expenses (
     'Energia elétrica',
     '22222222-2222-2222-2222-222222222202', -- Categoria Energia
     '33333333-3333-3333-3333-333333333301', -- Centro Administração
+    '55555555-5555-5555-5555-555555555501', -- Fornecedor Coelba
     'Neoenergia Coelba',
     350.00,
     CURRENT_DATE + INTERVAL '10 days',

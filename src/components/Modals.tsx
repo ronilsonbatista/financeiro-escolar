@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Expense, Income, Category, TransactionStatus } from '@/types/financial';
+import { Expense, Income, Category, Supplier, TransactionStatus } from '@/types/financial';
 import {
   X, Calendar, CheckCircle2, AlertCircle, Sparkles, Receipt, Trash2,
   ArrowUpRight, ArrowDownRight, Folder, Edit2, Plus, Info, Check, Eye, Lock
@@ -67,8 +67,10 @@ interface ExpenseFormModalProps {
   onClose: () => void;
   onSubmit: (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
   categories: Category[];
+  suppliers?: Supplier[];
   editingExpense?: Expense | null;
   onAddCategoryInline?: (category: Category) => void;
+  onAddSupplierInline?: (supplier: Supplier) => void;
 }
 
 export function ExpenseFormModal({
@@ -76,16 +78,23 @@ export function ExpenseFormModal({
   onClose,
   onSubmit,
   categories,
+  suppliers = [],
   editingExpense,
   onAddCategoryInline,
+  onAddSupplierInline,
 }: ExpenseFormModalProps) {
   const expenseCategories = categories.filter(c => 
     c.type === 'despesa' && (c.active || (editingExpense && c.id === editingExpense.categoryId))
   );
 
+  const activeSuppliers = suppliers.filter(s =>
+    s.isActive || (editingExpense && (s.id === editingExpense.supplierId || s.name === editingExpense.supplier))
+  );
+
   // Form States
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [supplierId, setSupplierId] = useState('');
   const [supplier, setSupplier] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -104,6 +113,13 @@ export function ExpenseFormModal({
   const [newCatColor, setNewCatColor] = useState('indigo');
   const [newCatIcon, setNewCatIcon] = useState('Folder');
 
+  // Inline Supplier Creator States
+  const [creatingInlineSupplier, setCreatingInlineSupplier] = useState(false);
+  const [newSupName, setNewSupName] = useState('');
+  const [newSupDoc, setNewSupDoc] = useState('');
+  const [newSupPhone, setNewSupPhone] = useState('');
+  const [newSupEmail, setNewSupEmail] = useState('');
+
   // Inline validation errors (no alerts rule)
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [revertConfirm, setRevertConfirm] = useState(false);
@@ -119,6 +135,7 @@ export function ExpenseFormModal({
     if (editingExpense) {
       setDescription(editingExpense.description);
       setCategoryId(editingExpense.categoryId);
+      setSupplierId(editingExpense.supplierId || '');
       setSupplier(editingExpense.supplier);
       setAmount(editingExpense.amount.toString());
       setDueDate(editingExpense.dueDate);
@@ -131,11 +148,13 @@ export function ExpenseFormModal({
       setCostCenter(editingExpense.costCenter || '');
       setNotes(editingExpense.notes || '');
       setCreatingInlineCategory(false);
+      setCreatingInlineSupplier(false);
     } else {
       setDescription('');
       if (expenseCategories.length > 0) {
         setCategoryId(expenseCategories[0].id);
       }
+      setSupplierId('');
       setSupplier('');
       setAmount('');
       const today = new Date().toISOString().split('T')[0];
@@ -149,8 +168,38 @@ export function ExpenseFormModal({
       setCostCenter('');
       setNotes('');
       setCreatingInlineCategory(false);
+      setCreatingInlineSupplier(false);
     }
   }, [editingExpense, isOpen]);
+
+  const handleCreateInlineSupplier = () => {
+    if (!newSupName.trim()) {
+      setErrorMessage('Por favor, insira o nome do fornecedor.');
+      return;
+    }
+    const newId = `sup-${Date.now()}-${Math.random()}`;
+    const newSup: Supplier = {
+      id: newId,
+      name: newSupName.trim(),
+      documentNumber: newSupDoc.trim() || undefined,
+      phone: newSupPhone.trim() || undefined,
+      email: newSupEmail.trim() || undefined,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (onAddSupplierInline) {
+      onAddSupplierInline(newSup);
+    }
+    setSupplierId(newId);
+    setSupplier(newSup.name);
+    setCreatingInlineSupplier(false);
+    setNewSupName('');
+    setNewSupDoc('');
+    setNewSupPhone('');
+    setNewSupEmail('');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +207,10 @@ export function ExpenseFormModal({
 
     if (creatingInlineCategory) {
       setErrorMessage('Por favor, salve ou cancele a criação da nova categoria antes de salvar a despesa.');
+      return;
+    }
+    if (creatingInlineSupplier) {
+      setErrorMessage('Por favor, salve ou cancele a criação do novo fornecedor antes de salvar a despesa.');
       return;
     }
     if (!description || !amount || parseFloat(amount) <= 0 || !dueDate || !categoryId || categoryId === 'NEW_CATEGORY') {
@@ -178,30 +231,24 @@ export function ExpenseFormModal({
       return;
     }
 
-    let finalStatus = status;
-    if (status === 'pendente') {
-      const todayStr = new Date().toISOString().split('T')[0];
-      if (dueDate < todayStr) {
-        finalStatus = 'atrasado';
-      }
-    }
-
     onSubmit({
       id: editingExpense?.id,
+      description: description.trim(),
       categoryId,
-      description,
-      supplier,
+      supplierId: supplierId || undefined,
+      supplier: supplier.trim(),
       amount: parseFloat(amount),
       dueDate,
       paymentDate: status === 'pago' ? paymentDate : undefined,
       paymentMethod: status === 'pago' ? paymentMethod : undefined,
-      status: finalStatus,
+      status,
       type: expenseType,
       isRecurring,
       recurrenceFrequency: isRecurring ? recurrenceFrequency : undefined,
       costCenter: costCenter || undefined,
       notes: notes || undefined,
     });
+
     onClose();
   };
 
@@ -347,17 +394,95 @@ export function ExpenseFormModal({
         </div>
 
         {/* Supplier & Amount */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-xs font-bold text-[#5C5E54] uppercase tracking-wide">Fornecedor *</label>
-            <input
-              type="text"
-              required
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              placeholder="Ex: Imobiliária Alfa, Sabesp"
+            <label className="text-xs font-bold text-[#5C5E54] uppercase tracking-wide">Fornecedor</label>
+            <select
+              value={creatingInlineSupplier ? 'NEW_SUPPLIER' : (supplierId || (activeSuppliers.find(s => s.name.toLowerCase() === supplier.toLowerCase())?.id || (supplier ? 'CUSTOM' : '')))}
+              onChange={(e) => {
+                if (e.target.value === 'NEW_SUPPLIER') {
+                  setCreatingInlineSupplier(true);
+                } else if (e.target.value === 'CUSTOM') {
+                  setSupplierId('');
+                  setCreatingInlineSupplier(false);
+                } else {
+                  const sel = activeSuppliers.find(s => s.id === e.target.value);
+                  if (sel) {
+                    setSupplierId(sel.id);
+                    setSupplier(sel.name);
+                  } else {
+                    setSupplierId('');
+                  }
+                  setCreatingInlineSupplier(false);
+                }
+              }}
               className="w-full walltravel-input px-4 py-2.5 text-sm text-[#16170F] font-semibold"
-            />
+            >
+              <option value="">Sem fornecedor informado...</option>
+              {activeSuppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+              <option value="NEW_SUPPLIER">+ Criar novo fornecedor...</option>
+            </select>
+
+            {/* Inline Supplier Form */}
+            {creatingInlineSupplier && (
+              <div className="p-4 rounded-lg border border-[#1E3280]/20 bg-[#F4F6FC] space-y-3 mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-[#1E3280] uppercase tracking-widest">Novo Fornecedor</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreatingInlineSupplier(false);
+                    }}
+                    className="text-[10px] font-bold text-[#A95454] hover:underline cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Nome do fornecedor *"
+                  value={newSupName}
+                  onChange={(e) => setNewSupName(e.target.value)}
+                  className="w-full walltravel-input px-3 py-1.5 text-xs font-semibold"
+                />
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <input
+                    type="text"
+                    placeholder="CNPJ/CPF"
+                    value={newSupDoc}
+                    onChange={(e) => setNewSupDoc(e.target.value)}
+                    className="w-full walltravel-input px-3 py-1.5 text-xs font-semibold"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Telefone"
+                    value={newSupPhone}
+                    onChange={(e) => setNewSupPhone(e.target.value)}
+                    className="w-full walltravel-input px-3 py-1.5 text-xs font-semibold"
+                  />
+                </div>
+
+                <input
+                  type="email"
+                  placeholder="E-mail"
+                  value={newSupEmail}
+                  onChange={(e) => setNewSupEmail(e.target.value)}
+                  className="w-full walltravel-input px-3 py-1.5 text-xs font-semibold"
+                />
+
+                <button
+                  type="button"
+                  onClick={handleCreateInlineSupplier}
+                  className="w-full py-2 text-xs font-bold rounded-lg bg-[#1E3280] text-white transition-colors cursor-pointer"
+                >
+                  Salvar e Selecionar
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -1554,6 +1679,293 @@ export function CloseMonthModal({
             <span>Confirmar Fechamento</span>
           </button>
         </div>
+      </div>
+    </ModalWrapper>
+  );
+}
+
+// 7. SUPPLIER MANAGER MODAL
+interface SupplierManagerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  suppliers: Supplier[];
+  expenses: Expense[];
+  onAddSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onUpdateSupplier: (id: string, supplier: Partial<Supplier>) => void;
+  onDeleteSupplier: (id: string) => boolean | Promise<boolean>;
+}
+
+export function SupplierManagerModal({
+  isOpen,
+  onClose,
+  suppliers,
+  expenses,
+  onAddSupplier,
+  onUpdateSupplier,
+  onDeleteSupplier,
+}: SupplierManagerModalProps) {
+  const [view, setView] = useState<'list' | 'form'>('list');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  // Form State
+  const [name, setName] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isActive, setIsActive] = useState(true);
+
+  const [blockMessage, setBlockMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setView('list');
+      setEditingId(null);
+      setBlockMessage(null);
+      setSearch('');
+    }
+  }, [isOpen]);
+
+  const handleOpenForm = (sup?: Supplier) => {
+    setBlockMessage(null);
+    if (sup) {
+      setEditingId(sup.id);
+      setName(sup.name);
+      setDocumentNumber(sup.documentNumber || '');
+      setPhone(sup.phone || '');
+      setEmail(sup.email || '');
+      setNotes(sup.notes || '');
+      setIsActive(sup.isActive);
+    } else {
+      setEditingId(null);
+      setName('');
+      setDocumentNumber('');
+      setPhone('');
+      setEmail('');
+      setNotes('');
+      setIsActive(true);
+    }
+    setView('form');
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    const exists = suppliers.some(
+      s => s.name.toLowerCase() === name.trim().toLowerCase() && s.id !== editingId
+    );
+    if (exists) {
+      setBlockMessage(`Já existe um fornecedor cadastrado com o nome "${name.trim()}".`);
+      return;
+    }
+
+    if (editingId) {
+      onUpdateSupplier(editingId, {
+        name: name.trim(),
+        documentNumber: documentNumber.trim() || undefined,
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        notes: notes.trim() || undefined,
+        isActive,
+      });
+    } else {
+      onAddSupplier({
+        name: name.trim(),
+        documentNumber: documentNumber.trim() || undefined,
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        notes: notes.trim() || undefined,
+        isActive: true,
+      });
+    }
+    setView('list');
+  };
+
+  const handleDelete = async (sup: Supplier) => {
+    setBlockMessage(null);
+    const isLinked = expenses.some(e => e.supplierId === sup.id || e.supplier.toLowerCase() === sup.name.toLowerCase());
+    if (isLinked) {
+      setBlockMessage(`O fornecedor "${sup.name}" possui despesas vinculadas. Ele foi alterado para inativo em vez de excluído.`);
+    }
+
+    await onDeleteSupplier(sup.id);
+  };
+
+  const filteredSuppliers = suppliers.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    (s.documentNumber && s.documentNumber.includes(search))
+  );
+
+  return (
+    <ModalWrapper isOpen={isOpen} onClose={onClose} title="Gerenciar Fornecedores">
+      <div className="space-y-5 text-[#16170F] text-left font-sans">
+        {blockMessage && (
+          <div className="flex items-start gap-2.5 p-4 rounded-xl border border-[#A95454]/20 bg-[#FAF2F2] text-[#A95454] text-xs font-semibold leading-relaxed">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <p>{blockMessage}</p>
+          </div>
+        )}
+
+        {view === 'list' ? (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center gap-2">
+              <input
+                type="text"
+                placeholder="Pesquisar fornecedor..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="walltravel-input px-3 py-2 text-xs font-semibold flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => handleOpenForm()}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg btn-wt-primary shrink-0 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Novo Fornecedor</span>
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100 max-h-[50vh] overflow-y-auto space-y-1 pr-1">
+              {filteredSuppliers.map(sup => {
+                const usageCount = expenses.filter(e => e.supplierId === sup.id || e.supplier.toLowerCase() === sup.name.toLowerCase()).length;
+                return (
+                  <div key={sup.id} className="flex items-center justify-between py-3 text-sm">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-slate-900">{sup.name}</span>
+                        {!sup.isActive && (
+                          <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">Inativo</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-500 space-x-2 mt-0.5">
+                        {sup.documentNumber && <span>CNPJ/CPF: {sup.documentNumber}</span>}
+                        {sup.phone && <span>&bull; {sup.phone}</span>}
+                        <span>&bull; {usageCount} {usageCount === 1 ? 'despesa' : 'despesas'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenForm(sup)}
+                        className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(sup)}
+                        className="p-2 rounded-lg border border-red-200 bg-white text-red-650 hover:bg-red-50 transition-all cursor-pointer"
+                        title="Excluir/Desativar"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredSuppliers.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-6">Nenhum fornecedor encontrado.</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSave} className="space-y-4">
+            <h4 className="text-xs font-black text-slate-600 uppercase tracking-wider">
+              {editingId ? 'Editar Fornecedor' : 'Novo Fornecedor'}
+            </h4>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">Nome do Fornecedor *</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Ex: Coelba, Papelaria & Cia"
+                className="w-full walltravel-input px-3 py-2 text-sm font-semibold"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 uppercase">CNPJ / CPF</label>
+                <input
+                  type="text"
+                  value={documentNumber}
+                  onChange={e => setDocumentNumber(e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  className="w-full walltravel-input px-3 py-2 text-xs font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 uppercase">Telefone</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="(73) 99999-0000"
+                  className="w-full walltravel-input px-3 py-2 text-xs font-semibold"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">E-mail</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="contato@fornecedor.com.br"
+                className="w-full walltravel-input px-3 py-2 text-xs font-semibold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">Observações</label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Informações adicionais..."
+                rows={2}
+                className="w-full walltravel-input px-3 py-2 text-xs font-semibold"
+              />
+            </div>
+
+            {editingId && (
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={e => setIsActive(e.target.checked)}
+                  className="accent-[#1E3280]"
+                />
+                Fornecedor Ativo
+              </label>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setView('list')}
+                className="flex-1 py-2.5 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Voltar
+              </button>
+
+              <button
+                type="submit"
+                className="flex-1 py-2.5 text-xs font-bold rounded-lg btn-wt-primary cursor-pointer"
+              >
+                Salvar Fornecedor
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </ModalWrapper>
   );

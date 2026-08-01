@@ -131,6 +131,7 @@ export default function ExpensesTable({
             <tr className="border-b border-slate-100 bg-brand-sand/40 text-slate-800 text-xs md:text-sm font-black tracking-wider uppercase">
               <th className="px-6 py-5">Descrição</th>
               <th className="px-6 py-5">Categoria</th>
+              <th className="px-6 py-5">Fornecedor</th>
               <th className="px-6 py-5">Vencimento</th>
               <th className="px-6 py-5 text-right">Valor</th>
               <th className="px-6 py-5 text-center">Status</th>
@@ -147,25 +148,19 @@ export default function ExpensesTable({
 
                 return (
                   <tr key={exp.id} className="hover:bg-slate-50/50 transition-colors group">
-                    {/* Descrição Column: Title description + lower details (Fornecedor + Centro de Custo) */}
+                    {/* Descrição Column */}
                     <td className="px-6 py-6.5">
                       <div className="space-y-1.5 text-left">
                         <span className="font-extrabold text-slate-900 text-sm md:text-base block">{exp.description}</span>
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] md:text-xs text-slate-500 font-semibold leading-none">
-                          <span>{exp.supplier}</span>
-                          {exp.costCenter && (
-                            <>
-                              <span>&bull;</span>
-                              <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/40 text-slate-650 font-bold uppercase tracking-wider text-[9px]">
-                                {exp.costCenter}
-                              </span>
-                            </>
-                          )}
-                        </div>
+                        {exp.costCenter && (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/40 text-slate-650 font-bold uppercase tracking-wider text-[9px]">
+                            {exp.costCenter}
+                          </span>
+                        )}
                       </div>
                     </td>
 
-                    {/* Categoria Column: icon square + label + badge */}
+                    {/* Categoria Column */}
                     <td className="px-6 py-6.5">
                       <div className="flex items-center gap-3">
                         <div 
@@ -184,6 +179,11 @@ export default function ExpensesTable({
                           </span>
                         </div>
                       </div>
+                    </td>
+
+                    {/* Fornecedor Column */}
+                    <td className="px-6 py-6.5 text-xs md:text-sm text-slate-800 font-bold text-left">
+                      {exp.supplier?.trim() ? exp.supplier : <span className="text-slate-400 font-normal italic">Sem fornecedor</span>}
                     </td>
 
                     {/* Vencimento Column: Due Date (and payment date if paid) */}
@@ -387,7 +387,7 @@ export default function ExpensesTable({
                   </div>
                 </div>
 
-                {/* MEIO: Categoria, Vencimento, Pagamento */}
+                {/* MEIO: Categoria, Fornecedor, Vencimento, Pagamento */}
                 <div className="pt-3 border-t border-slate-100 space-y-2 text-xs text-left">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 font-bold">Categoria:</span>
@@ -400,6 +400,11 @@ export default function ExpensesTable({
                       </div>
                       <span className="font-bold text-slate-900">{cat.name}</span>
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-bold">Fornecedor:</span>
+                    <span className="font-bold text-slate-900">{exp.supplier?.trim() ? exp.supplier : 'Sem fornecedor'}</span>
                   </div>
 
                   <div className="flex items-center justify-between">

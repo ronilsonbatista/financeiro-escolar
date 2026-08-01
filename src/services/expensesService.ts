@@ -28,6 +28,7 @@ export const mapDbRowToExpense = (row: any): Expense => {
     id: row.id,
     description: row.description,
     categoryId: row.category_id || '',
+    supplierId: row.supplier_id || undefined,
     supplier: row.supplier || '',
     amount: Number(row.amount),
     dueDate: row.due_date,
@@ -104,6 +105,7 @@ export const createExpense = async (expenseData: Partial<Expense>): Promise<{ da
       const payload = {
         description: expenseData.description.trim(),
         category_id: expenseData.categoryId,
+        supplier_id: expenseData.supplierId || null,
         supplier: expenseData.supplier?.trim() || null,
         amount: expenseData.amount,
         due_date: expenseData.dueDate,
@@ -144,6 +146,7 @@ export const createExpense = async (expenseData: Partial<Expense>): Promise<{ da
     id: `exp-${Date.now()}`,
     description: expenseData.description.trim(),
     categoryId: expenseData.categoryId,
+    supplierId: expenseData.supplierId,
     supplier: expenseData.supplier?.trim() || '',
     amount: expenseData.amount,
     dueDate: expenseData.dueDate,
@@ -172,6 +175,7 @@ export const updateExpense = async (id: string, updates: Partial<Expense>): Prom
       const payload: any = { updated_at: new Date().toISOString() };
       if (updates.description !== undefined) payload.description = updates.description.trim();
       if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
+      if (updates.supplierId !== undefined) payload.supplier_id = updates.supplierId || null;
       if (updates.supplier !== undefined) payload.supplier = updates.supplier.trim();
       if (updates.amount !== undefined) payload.amount = updates.amount;
       if (updates.dueDate !== undefined) payload.due_date = updates.dueDate;
