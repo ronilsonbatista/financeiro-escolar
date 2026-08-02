@@ -31,6 +31,7 @@ import { listIncomes, createIncome, updateIncome, deleteIncome } from '@/service
 import { listCategories, createCategory, updateCategory, deleteCategory } from '@/services/categoriesService';
 import { getSchoolSettings, updateSchoolSettings } from '@/services/settingsService';
 import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from '@/services/suppliersService';
+import { loadDemoDataSafely, clearDemoDataSafely } from '@/services/demoSeedService';
 
 // Redesigned: Seed categories limited to exactly 10 default expense categories and 3 default revenue categories
 const seedCategories: Category[] = [
@@ -164,9 +165,20 @@ export default function FinancialDashboard() {
           getSchoolSettings()
         ]);
 
-        setCategories(fetchedCategories);
-        setSuppliers(fetchedSuppliers);
-        setExpenses(fetchedExpenses);
+        let cats = fetchedCategories;
+        let sups = fetchedSuppliers;
+        let exps = fetchedExpenses;
+
+        if (exps.length <= 1) {
+          const demoData = await loadDemoDataSafely();
+          cats = demoData.categories;
+          sups = demoData.suppliers;
+          exps = demoData.expenses;
+        }
+
+        setCategories(cats);
+        setSuppliers(sups);
+        setExpenses(exps);
         setIncomes(fetchedIncomes);
 
         if (fetchedSettings.schoolName) setSchoolName(fetchedSettings.schoolName);
@@ -765,17 +777,35 @@ export default function FinancialDashboard() {
     });
   };
 
-  // Reset to original Seeds for Clean state testing in v3 key namespaces
-  const handleResetToSeeds = () => {
-    setCategories(seedCategories);
-    setExpenses(seedExpenses);
-    setIncomes(seedIncomes);
-    setIsMonthClosed(false);
-    localStorage.setItem('school_categories_v3', JSON.stringify(seedCategories));
-    localStorage.setItem('school_expenses_v3', JSON.stringify(seedExpenses));
-    localStorage.setItem('school_incomes_v3', JSON.stringify(seedIncomes));
-    localStorage.setItem('school_month_closed_v3', JSON.stringify(false));
-    addToast('info', 'Dados Limpos', 'O sistema foi reiniciado com apenas 1 registro de teste.');
+  const handleLoadDemoData = () => {
+    setDeleteConfirmState({
+      isOpen: true,
+      title: 'Carregar Dados de Demonstração',
+      itemName: '25 Despesas + 12 Fornecedores + 14 Categorias',
+      warningText: 'Os dados de teste realistas serão populados no CEBS Financeiro sem duplicar lançamentos.',
+      onConfirm: async () => {
+        const demoData = await loadDemoDataSafely();
+        setCategories(demoData.categories);
+        setSuppliers(demoData.suppliers);
+        setExpenses(demoData.expenses);
+        addToast('success', 'Dados de Demonstração Carregados', 'O CEBS Financeiro foi populado com 25 despesas realistas.');
+      },
+    });
+  };
+
+  const handleClearDemoData = () => {
+    setDeleteConfirmState({
+      isOpen: true,
+      title: 'Limpar Dados de Demonstração',
+      itemName: 'Despesas de Teste',
+      warningText: 'Esta ação irá remover apenas os lançamentos de demonstração.',
+      onConfirm: async () => {
+        await clearDemoDataSafely();
+        const updatedExps = await listExpenses();
+        setExpenses(updatedExps);
+        addToast('info', 'Dados Demo Limpos', 'Lançamentos de demonstração removidos com sucesso.');
+      },
+    });
   };
 
   const handleExportCSV = () => {
@@ -990,9 +1020,14 @@ export default function FinancialDashboard() {
               <span className="hidden xs:inline">Nova Despesa</span>
             </button>
 
-            {/* Reset ghost — hidden on mobile */}
-            <button onClick={handleResetToSeeds} title="Limpar dados de demonstração" className="hidden md:block" style={{ padding: '6px 8px', borderRadius: '7px', border: '1.5px solid transparent', backgroundColor: 'transparent', color: '#C4C9D1', fontSize: '11px', fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500 }}>
-              Limpar
+            {/* Demo Data Controls */}
+            <button onClick={handleLoadDemoData} title="Carregar 25 dados de demonstração" className="hidden lg:flex" style={{ alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '7px', border: '1.5px solid rgba(30,50,128,0.2)', backgroundColor: '#F4F6FC', color: '#1E3280', fontSize: '11px', fontFamily: 'inherit', cursor: 'pointer', fontWeight: 700 }}>
+              <Sparkles style={{ width: '12px', height: '12px' }} />
+              <span>Carregar Demo</span>
+            </button>
+
+            <button onClick={handleClearDemoData} title="Limpar dados de demonstração" className="hidden lg:block" style={{ padding: '6px 8px', borderRadius: '7px', border: '1.5px solid transparent', backgroundColor: 'transparent', color: '#9CA3AF', fontSize: '11px', fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500 }}>
+              Limpar Demo
             </button>
           </div>
         </header>
@@ -1009,14 +1044,11 @@ export default function FinancialDashboard() {
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                style={{
-                  padding: '13px 16px', fontSize: '13px', fontFamily: 'inherit',
-                  fontWeight: activeTab === id ? 600 : 500,
-                  color: activeTab === id ? '#1E3280' : '#6B7280',
-                  borderBottom: `2px solid ${activeTab === id ? '#1E3280' : 'transparent'}`,
-                  border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
-                  transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
-                }}
+                className={`px-4 py-3 text-xs md:text-sm font-semibold transition-colors border-b-2 cursor-pointer bg-transparent whitespace-nowrap shrink-0 ${
+                  activeTab === id
+                    ? 'border-[#1E3280] text-[#1E3280]'
+                    : 'border-transparent text-slate-500 hover:text-slate-900'
+                }`}
               >{label}</button>
             ))}
 
