@@ -2,13 +2,14 @@
 /* eslint-disable @next/next/no-img-element */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Expense, Income, Category, Supplier, TransactionStatus } from '@/types/financial';
 import {
   TrendingUp, TrendingDown, Clock, AlertTriangle, Scale, PieChart,
   PlusCircle, FilterX, HelpCircle, ArrowRightLeft, FolderOpen,
   DollarSign, FileSpreadsheet, ListFilter, CheckSquare, Sparkles,
   Lock, Unlock, ChevronRight, Tags, AlertCircle, Trash2, CheckCircle2,
-  LayoutDashboard, Receipt, Settings, Users, CreditCard, BarChart3, Menu, Truck
+  LayoutDashboard, Receipt, Settings, Users, CreditCard, BarChart3, Menu, Truck, LogOut
 } from 'lucide-react';
 import DateRangeFilter, { DateRangeOption } from '@/components/DateRangeFilter';
 import CategoryCardsGrid from '@/components/CategoryCardsGrid';
@@ -33,6 +34,8 @@ import { getSchoolSettings, updateSchoolSettings } from '@/services/settingsServ
 import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from '@/services/suppliersService';
 import { loadDemoDataSafely, clearDemoDataSafely } from '@/services/demoSeedService';
 import { parseSupabaseError } from '@/lib/supabase/handleSupabaseError';
+import { getCurrentSession, signOutUser } from '@/lib/supabase/auth';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
 // Redesigned: Seed categories limited to exactly 10 default expense categories and 3 default revenue categories
 const seedCategories: Category[] = [
@@ -153,6 +156,37 @@ export default function FinancialDashboard() {
     isOpen: false,
     expense: null,
   });
+
+  const router = useRouter();
+
+  // Auth protection & session listener
+  useEffect(() => {
+    async function checkAuth() {
+      if (isSupabaseConfigured()) {
+        const session = await getCurrentSession();
+        if (!session) {
+          router.replace('/login');
+          return;
+        }
+
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (!session) {
+            router.replace('/login');
+          }
+        });
+
+        return () => {
+          authListener?.subscription?.unsubscribe();
+        };
+      }
+    }
+    checkAuth();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await signOutUser();
+    router.replace('/login');
+  };
 
   // Safe Hydration on mount using database & service layer with fallback
   useEffect(() => {
@@ -1027,6 +1061,30 @@ export default function FinancialDashboard() {
 
             <button onClick={handleClearDemoData} title="Limpar dados de demonstração" className="hidden lg:block" style={{ padding: '6px 8px', borderRadius: '7px', border: '1.5px solid transparent', backgroundColor: 'transparent', color: '#9CA3AF', fontSize: '11px', fontFamily: 'inherit', cursor: 'pointer', fontWeight: 500 }}>
               Limpar Demo
+            </button>
+
+            {/* Botão Sair / Encerrar Sessão */}
+            <button
+              onClick={handleLogout}
+              title="Encerrar Sessão"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '7px 10px',
+                borderRadius: '7px',
+                border: '1.5px solid #FCA5A5',
+                backgroundColor: '#FEF2F2',
+                color: '#991B1B',
+                fontSize: '12px',
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              <LogOut style={{ width: '13px', height: '13px', color: '#DC2626' }} />
+              <span className="hidden md:inline">Sair</span>
             </button>
           </div>
         </header>

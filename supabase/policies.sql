@@ -12,38 +12,73 @@ ALTER TABLE expense_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE school_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incomes ENABLE ROW LEVEL SECURITY;
 
+-- Remover políticas legadas
+DROP POLICY IF EXISTS "Permitir leitura de usuários" ON users;
+DROP POLICY IF EXISTS "Permitir inserção e atualização de usuários" ON users;
+DROP POLICY IF EXISTS "Permitir leitura de categorias" ON categories;
+DROP POLICY IF EXISTS "Permitir gestão de categorias" ON categories;
+DROP POLICY IF EXISTS "Permitir leitura de centros de custo" ON cost_centers;
+DROP POLICY IF EXISTS "Permitir gestão de centros de custo" ON cost_centers;
+DROP POLICY IF EXISTS "Permitir leitura de fornecedores" ON suppliers;
+DROP POLICY IF EXISTS "Permitir gestão de fornecedores" ON suppliers;
+DROP POLICY IF EXISTS "Permitir leitura de despesas não excluídas" ON expenses;
+DROP POLICY IF EXISTS "Permitir gestão de despesas" ON expenses;
+DROP POLICY IF EXISTS "Permitir leitura do histórico de despesas" ON expense_history;
+DROP POLICY IF EXISTS "Permitir criação de registros de histórico" ON expense_history;
+DROP POLICY IF EXISTS "Permitir leitura das configurações da escola" ON school_settings;
+DROP POLICY IF EXISTS "Permitir atualização das configurações da escola" ON school_settings;
+DROP POLICY IF EXISTS "Permitir leitura de receitas não excluídas" ON incomes;
+DROP POLICY IF EXISTS "Permitir gestão de receitas" ON incomes;
+DROP POLICY IF EXISTS "Acesso autenticado users" ON users;
+DROP POLICY IF EXISTS "Acesso autenticado categories" ON categories;
+DROP POLICY IF EXISTS "Acesso autenticado cost_centers" ON cost_centers;
+DROP POLICY IF EXISTS "Acesso autenticado suppliers" ON suppliers;
+DROP POLICY IF EXISTS "Acesso autenticado expenses" ON expenses;
+DROP POLICY IF EXISTS "Acesso autenticado expense_history" ON expense_history;
+DROP POLICY IF EXISTS "Acesso autenticado school_settings" ON school_settings;
+DROP POLICY IF EXISTS "Acesso autenticado incomes" ON incomes;
+
 -- -------------------------------------------------------
--- Políticas para MVP Privado (Acesso Geral da Aplicação)
+-- Políticas de Acesso Exclusivo para Usuários Autenticados (authenticated)
+-- Usuários anônimos (anon) são totalmente bloqueados.
 -- -------------------------------------------------------
 
--- 1. Políticas para USERS
-CREATE POLICY "Permitir leitura de usuários" ON users FOR SELECT USING (true);
-CREATE POLICY "Permitir inserção e atualização de usuários" ON users FOR ALL USING (true);
+-- 1. Tabela USERS
+CREATE POLICY "Acesso autenticado users" ON users 
+  FOR ALL TO authenticated 
+  USING (true) WITH CHECK (true);
 
--- 2. Políticas para CATEGORIES
-CREATE POLICY "Permitir leitura de categorias" ON categories FOR SELECT USING (true);
-CREATE POLICY "Permitir gestão de categorias" ON categories FOR ALL USING (true);
+-- 2. Tabela CATEGORIES
+CREATE POLICY "Acesso autenticado categories" ON categories 
+  FOR ALL TO authenticated 
+  USING (true) WITH CHECK (true);
 
--- 3. Políticas para COST_CENTERS
-CREATE POLICY "Permitir leitura de centros de custo" ON cost_centers FOR SELECT USING (true);
-CREATE POLICY "Permitir gestão de centros de custo" ON cost_centers FOR ALL USING (true);
+-- 3. Tabela COST_CENTERS
+CREATE POLICY "Acesso autenticado cost_centers" ON cost_centers 
+  FOR ALL TO authenticated 
+  USING (true) WITH CHECK (true);
 
--- 4. Políticas para SUPPLIERS
-CREATE POLICY "Permitir leitura de fornecedores" ON suppliers FOR SELECT USING (true);
-CREATE POLICY "Permitir gestão de fornecedores" ON suppliers FOR ALL USING (true);
+-- 4. Tabela SUPPLIERS
+CREATE POLICY "Acesso autenticado suppliers" ON suppliers 
+  FOR ALL TO authenticated 
+  USING (true) WITH CHECK (true);
 
--- 5. Políticas para EXPENSES
-CREATE POLICY "Permitir leitura de despesas não excluídas" ON expenses FOR SELECT USING (deleted_at IS NULL);
-CREATE POLICY "Permitir gestão de despesas" ON expenses FOR ALL USING (true);
+-- 5. Tabela EXPENSES
+CREATE POLICY "Acesso autenticado expenses" ON expenses 
+  FOR ALL TO authenticated 
+  USING (true) WITH CHECK (true);
 
--- 6. Políticas para EXPENSE_HISTORY
-CREATE POLICY "Permitir leitura do histórico de despesas" ON expense_history FOR SELECT USING (true);
-CREATE POLICY "Permitir criação de registros de histórico" ON expense_history FOR INSERT WITH CHECK (true);
+-- 6. Tabela EXPENSE_HISTORY
+CREATE POLICY "Acesso autenticado expense_history" ON expense_history 
+  FOR ALL TO authenticated 
+  USING (true) WITH CHECK (true);
 
--- 7. Políticas para SCHOOL_SETTINGS
-CREATE POLICY "Permitir leitura das configurações da escola" ON school_settings FOR SELECT USING (true);
-CREATE POLICY "Permitir atualização das configurações da escola" ON school_settings FOR ALL USING (true);
+-- 7. Tabela SCHOOL_SETTINGS
+CREATE POLICY "Acesso autenticado school_settings" ON school_settings 
+  FOR ALL TO authenticated 
+  USING (true) WITH CHECK (true);
 
--- 8. Políticas para INCOMES
-CREATE POLICY "Permitir leitura de receitas não excluídas" ON incomes FOR SELECT USING (deleted_at IS NULL);
-CREATE POLICY "Permitir gestão de receitas" ON incomes FOR ALL USING (true);
+-- 8. Tabela INCOMES
+CREATE POLICY "Acesso autenticado incomes" ON incomes 
+  FOR ALL TO authenticated 
+  USING (true) WITH CHECK (true);
