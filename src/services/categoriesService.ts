@@ -26,7 +26,7 @@ export const listCategories = async (): Promise<Category[]> => {
         .order('name', { ascending: true });
 
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data) {
         return data.map(item => ({
           id: item.id,
           name: item.name,

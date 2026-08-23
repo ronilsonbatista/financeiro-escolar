@@ -38,7 +38,8 @@ export interface Expense {
   type: 'fixa' | 'variavel' | 'recorrente' | 'extraordinaria';
   isRecurring: boolean;
   recurrenceFrequency?: string; // semanal, mensal, trimestral, anual
-  costCenter?: string; // Centro de custo
+  costCenterId?: string; // foreign key to CostCenter (UUID)
+  costCenter?: string; // text representation / name of cost center
   notes?: string;
   createdAt: string;
   updatedAt: string;

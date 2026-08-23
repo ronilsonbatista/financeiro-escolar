@@ -165,20 +165,9 @@ export default function FinancialDashboard() {
           getSchoolSettings()
         ]);
 
-        let cats = fetchedCategories;
-        let sups = fetchedSuppliers;
-        let exps = fetchedExpenses;
-
-        if (exps.length <= 1) {
-          const demoData = await loadDemoDataSafely();
-          cats = demoData.categories;
-          sups = demoData.suppliers;
-          exps = demoData.expenses;
-        }
-
-        setCategories(cats);
-        setSuppliers(sups);
-        setExpenses(exps);
+        setCategories(fetchedCategories);
+        setSuppliers(fetchedSuppliers);
+        setExpenses(fetchedExpenses);
         setIncomes(fetchedIncomes);
 
         if (fetchedSettings.schoolName) setSchoolName(fetchedSettings.schoolName);

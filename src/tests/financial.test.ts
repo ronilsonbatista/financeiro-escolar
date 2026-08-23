@@ -95,9 +95,9 @@ const validateExpense = (exp: {
 describe('School Financial System Logic Tests (Fase 4)', () => {
   // Mock baseline data
   const mockCategories: Category[] = [
-    { id: 'cat-1', name: 'Salários', type: 'despesa', active: true, color: 'blue', icon: 'User' },
-    { id: 'cat-2', name: 'Energia', type: 'despesa', active: true, color: 'yellow', icon: 'Zap' },
-    { id: 'cat-3', name: 'Internet', type: 'despesa', active: false, color: 'indigo', icon: 'Wifi' },
+    { id: 'cat-1', name: 'Salários', type: 'despesa', active: true, color: 'blue', icon: 'User', createdAt: '2026-07-01', updatedAt: '2026-07-01' },
+    { id: 'cat-2', name: 'Energia', type: 'despesa', active: true, color: 'yellow', icon: 'Zap', createdAt: '2026-07-01', updatedAt: '2026-07-01' },
+    { id: 'cat-3', name: 'Internet', type: 'despesa', active: false, color: 'indigo', icon: 'Wifi', createdAt: '2026-07-01', updatedAt: '2026-07-01' },
   ];
 
   const mockExpenses: Expense[] = [
@@ -110,6 +110,7 @@ describe('School Financial System Logic Tests (Fase 4)', () => {
       dueDate: '2026-07-20',
       status: 'pendente',
       type: 'fixa',
+      isRecurring: false,
       createdAt: '2026-07-04',
       updatedAt: '2026-07-04',
       costCenter: 'Administração',
@@ -125,10 +126,11 @@ describe('School Financial System Logic Tests (Fase 4)', () => {
       paymentDate: '2026-07-05',
       paymentMethod: 'PIX',
       type: 'fixa',
+      isRecurring: false,
       createdAt: '2026-07-04',
       updatedAt: '2026-07-04',
       costCenter: 'Pedagógico',
-    }
+    },
   ];
 
   const mockIncomes: Income[] = [];
