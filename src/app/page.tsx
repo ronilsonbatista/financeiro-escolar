@@ -32,6 +32,7 @@ import { listCategories, createCategory, updateCategory, deleteCategory } from '
 import { getSchoolSettings, updateSchoolSettings } from '@/services/settingsService';
 import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from '@/services/suppliersService';
 import { loadDemoDataSafely, clearDemoDataSafely } from '@/services/demoSeedService';
+import { parseSupabaseError } from '@/lib/supabase/handleSupabaseError';
 
 // Redesigned: Seed categories limited to exactly 10 default expense categories and 3 default revenue categories
 const seedCategories: Category[] = [
@@ -460,7 +461,8 @@ export default function FinancialDashboard() {
 
       const res = await updateExpense(data.id!, data);
       if (res.error) {
-        addToast('error', 'Erro ao Atualizar', res.error);
+        const err = parseSupabaseError(res.error);
+        addToast('error', err.title, err.message);
         return;
       }
       if (res.data) {
@@ -470,7 +472,8 @@ export default function FinancialDashboard() {
     } else {
       const res = await createExpense(data);
       if (res.error) {
-        addToast('error', 'Erro ao Cadastrar', res.error);
+        const err = parseSupabaseError(res.error);
+        addToast('error', err.title, err.message);
         return;
       }
       if (res.data) {
@@ -649,7 +652,8 @@ export default function FinancialDashboard() {
   const handleAddCategory = async (newCat: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
     const res = await createCategory(newCat);
     if (res.error) {
-      addToast('error', 'Erro de Duplicidade', res.error);
+      const err = parseSupabaseError(res.error);
+      addToast('error', err.title, err.message);
       return;
     }
     if (res.data) {
@@ -662,7 +666,8 @@ export default function FinancialDashboard() {
   const handleAddCategoryInline = async (newCat: Category) => {
     const res = await createCategory(newCat);
     if (res.error) {
-      addToast('error', 'Erro ao criar Categoria', res.error);
+      const err = parseSupabaseError(res.error);
+      addToast('error', err.title, err.message);
       return;
     }
     if (res.data) {
@@ -674,7 +679,8 @@ export default function FinancialDashboard() {
   const handleUpdateCategory = async (id: string, updatedFields: Partial<Category>) => {
     const res = await updateCategory(id, updatedFields);
     if (res.error) {
-      addToast('error', 'Erro ao Atualizar', res.error);
+      const err = parseSupabaseError(res.error);
+      addToast('error', err.title, err.message);
       return;
     }
     if (res.data) {
@@ -687,7 +693,8 @@ export default function FinancialDashboard() {
     const isUsed = expenses.some(e => e.categoryId === id) || incomes.some(i => i.categoryId === id);
     const res = await deleteCategory(id, isUsed);
     if (!res.success) {
-      addToast('error', 'Aviso', res.message);
+      const err = parseSupabaseError(res.message);
+      addToast('error', err.title, err.message);
       return false;
     }
     const updatedCats = await listCategories();
@@ -700,7 +707,8 @@ export default function FinancialDashboard() {
   const handleAddSupplier = async (newSup: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>) => {
     const res = await createSupplier(newSup);
     if (res.error) {
-      addToast('error', 'Erro de Duplicidade', res.error);
+      const err = parseSupabaseError(res.error);
+      addToast('error', err.title, err.message);
       return;
     }
     if (res.data) {
@@ -712,7 +720,8 @@ export default function FinancialDashboard() {
   const handleAddSupplierInline = async (newSup: Supplier) => {
     const res = await createSupplier(newSup);
     if (res.error) {
-      addToast('error', 'Erro ao criar Fornecedor', res.error);
+      const err = parseSupabaseError(res.error);
+      addToast('error', err.title, err.message);
       return;
     }
     if (res.data) {
@@ -724,7 +733,8 @@ export default function FinancialDashboard() {
   const handleUpdateSupplier = async (id: string, updatedFields: Partial<Supplier>) => {
     const res = await updateSupplier(id, updatedFields);
     if (res.error) {
-      addToast('error', 'Erro ao Atualizar', res.error);
+      const err = parseSupabaseError(res.error);
+      addToast('error', err.title, err.message);
       return;
     }
     if (res.data) {
