@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   keywords: "CEBS, financeiro, escola, despesas, controle financeiro, Centro Educacional Batista Sobrinho",
 };
 
+import { LayoutModeProvider } from "@/contexts/LayoutModeContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -69,7 +71,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full antialiased font-sans" style={{ fontFamily: "'Inter', sans-serif" }} suppressHydrationWarning>
-        {children}
+        <LayoutModeProvider>
+          {children}
+        </LayoutModeProvider>
       </body>
     </html>
   );
