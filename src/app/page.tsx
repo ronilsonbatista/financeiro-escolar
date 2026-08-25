@@ -36,6 +36,7 @@ import { loadDemoDataSafely, clearDemoDataSafely } from '@/services/demoSeedServ
 import { parseSupabaseError } from '@/lib/supabase/handleSupabaseError';
 import { getCurrentSession, signOutUser } from '@/lib/supabase/auth';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import ReportsView from '@/components/ReportsView';
 
 // Redesigned: Seed categories limited to exactly 10 default expense categories and 3 default revenue categories
 const seedCategories: Category[] = [
@@ -1801,100 +1802,11 @@ export default function FinancialDashboard() {
 
           {/* ─── TAB: RELATÓRIOS ─── */}
           {activeTab === 'reports' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#111827' }}>Relatórios</h3>
-                  <p style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 500, marginTop: '2px' }}>Resumo financeiro do período atual</p>
-                </div>
-                <button
-                  onClick={handleExportCSV}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: '1.5px solid #1E3280', backgroundColor: '#fff', color: '#1E3280', fontSize: '12px', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', transition: 'all 0.15s' }}
-                >
-                  <FileSpreadsheet style={{ width: '13px', height: '13px' }} />
-                  Exportar CSV
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-                {/* Despesas summary */}
-                <div className="walltravel-panel" style={{ padding: '22px 24px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: '14px' }}>Resumo de Despesas</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {[
-                      { label: 'Total do mês', value: -cardsData.totalExpenses, type: 'neutral' as const },
-                      { label: 'Pagas', value: -cardsData.paidExpenses, type: 'positive' as const },
-                      { label: 'Pendentes', value: -cardsData.pendingExpenses, type: 'neutral' as const },
-                      { label: 'Vencidas', value: -cardsData.overdueExpenses, type: 'negative' as const },
-                    ].map(row => (
-                      <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '13px', color: row.label === 'Vencidas' ? '#B94A48' : '#6B7280', fontWeight: row.label === 'Vencidas' ? 600 : 400 }}>{row.label}</span>
-                        <CurrencyValue value={row.value} colorType={row.type} size="sm" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Por categoria */}
-                <div className="walltravel-panel" style={{ padding: '22px 24px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: '14px' }}>Por Categoria</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {categories.filter(c => c.type === 'despesa' && c.active).map(cat => {
-                      const catTotal = processedExpenses.filter(e => e.categoryId === cat.id && e.status !== 'cancelado').reduce((s, e) => s + e.amount, 0);
-                      if (catTotal === 0) return null;
-                      return (
-                        <div key={cat.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', color: '#6B7280' }}>{cat.name}</span>
-                          <CurrencyValue value={-catTotal} colorType="neutral" size="sm" />
-                        </div>
-                      );
-                    })}
-                    {categories.filter(c => c.type === 'despesa' && c.active).every(c => processedExpenses.filter(e => e.categoryId === c.id && e.status !== 'cancelado').reduce((s, e) => s + e.amount, 0) === 0) && (
-                      <p style={{ fontSize: '12px', color: '#D1D5DB', textAlign: 'center', padding: '8px 0' }}>Nenhuma despesa registrada</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Por fornecedor */}
-                <div className="walltravel-panel" style={{ padding: '22px 24px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: '14px' }}>Por Fornecedor</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {suppliers.map(sup => {
-                      const supTotal = processedExpenses.filter(e => (e.supplierId === sup.id || e.supplier.toLowerCase() === sup.name.toLowerCase()) && e.status !== 'cancelado').reduce((s, e) => s + e.amount, 0);
-                      if (supTotal === 0) return null;
-                      return (
-                        <div key={sup.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', color: '#6B7280' }}>{sup.name}</span>
-                          <CurrencyValue value={-supTotal} colorType="neutral" size="sm" />
-                        </div>
-                      );
-                    })}
-                    {suppliers.every(s => processedExpenses.filter(e => (e.supplierId === s.id || e.supplier.toLowerCase() === s.name.toLowerCase()) && e.status !== 'cancelado').reduce((sum, e) => sum + e.amount, 0) === 0) && (
-                      <p style={{ fontSize: '12px', color: '#D1D5DB', textAlign: 'center', padding: '8px 0' }}>Nenhum fornecedor vinculado</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Receitas */}
-                <div className="walltravel-panel" style={{ padding: '22px 24px' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', marginBottom: '14px' }}>Receitas e Resultado</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '13px', color: '#6B7280' }}>Receita bruta</span>
-                      <CurrencyValue value={cardsData.grossRevenue} colorType="positive" size="sm" />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '13px', color: '#6B7280' }}>Lançamentos</span>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>{cardsData.countIncomes}</span>
-                    </div>
-                    <div style={{ borderTop: '1px solid #F3F4F6', marginTop: '4px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Resultado líquido</span>
-                      <CurrencyValue value={cardsData.grossRevenue - cardsData.paidExpenses} colorType="auto" size="sm" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ReportsView
+              allExpenses={expenses}
+              categories={categories}
+              suppliers={suppliers}
+            />
           )}
 
         </div>
